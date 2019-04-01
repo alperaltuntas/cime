@@ -3,7 +3,7 @@ case_run is a member of Class Case
 '"""
 from CIME.XML.standard_module_setup import *
 from CIME.utils                     import gzip_existing_file, new_lid, run_and_log_case_status
-from CIME.utils                     import run_sub_or_cmd, append_status
+from CIME.utils                     import run_sub_or_cmd, append_status, safe_copy, model_log
 from CIME.get_timing                import get_timing
 from CIME.provenance                import save_prerun_provenance, save_postrun_provenance
 
@@ -22,13 +22,12 @@ def _pre_run_check(case, lid, skip_pnl=False, da_cycle=0):
 
     caseroot = case.get_value("CASEROOT")
     din_loc_root = case.get_value("DIN_LOC_ROOT")
-    batchsubmit = case.get_value("BATCHSUBMIT")
     rundir = case.get_value("RUNDIR")
     build_complete = case.get_value("BUILD_COMPLETE")
 
     if case.get_value("TESTCASE") == "PFS":
         env_mach_pes = os.path.join(caseroot,"env_mach_pes.xml")
-        shutil.copy(env_mach_pes,"{}.{}".format(env_mach_pes, lid))
+        safe_copy(env_mach_pes,"{}.{}".format(env_mach_pes, lid))
 
     # check for locked files.
     case.check_lockedfiles()
@@ -42,17 +41,6 @@ def _pre_run_check(case, lid, skip_pnl=False, da_cycle=0):
     # load the module environment...
     case.load_env(reset=True)
 
-    # set environment variables
-
-    if batchsubmit is None or len(batchsubmit) == 0:
-        os.environ["LBQUERY"] = "FALSE"
-        os.environ["BATCHQUERY"] = "undefined"
-    elif batchsubmit == 'UNSET':
-        os.environ["LBQUERY"] = "FALSE"
-        os.environ["BATCHQUERY"] = "undefined"
-    else:
-        os.environ["LBQUERY"] = "TRUE"
-
     # create the timing directories, optionally cleaning them if needed.
     if os.path.isdir(os.path.join(rundir, "timing")):
         shutil.rmtree(os.path.join(rundir, "timing"))
@@ -62,11 +50,14 @@ def _pre_run_check(case, lid, skip_pnl=False, da_cycle=0):
     # This needs to be done everytime the LID changes in order for log files to be set up correctly
     # The following also needs to be called in case a user changes a user_nl_xxx file OR an env_run.xml
     # variable while the job is in the queue
+    model_log("e3sm", logger, "{} NAMELIST CREATION BEGINS HERE".format(time.strftime("%Y-%m-%d %H:%M:%S")))
     if skip_pnl:
         case.create_namelists(component='cpl')
     else:
         logger.info("Generating namelists for {}".format(caseroot))
         case.create_namelists()
+
+    model_log("e3sm", logger, "{} NAMELIST CREATION HAS FINISHED".format(time.strftime("%Y-%m-%d %H:%M:%S")))
 
     logger.info("-------------------------------------------------------------------------")
     logger.info(" - Prestage required restarts into {}".format(rundir))
@@ -78,7 +69,9 @@ def _pre_run_check(case, lid, skip_pnl=False, da_cycle=0):
 def _run_model_impl(case, lid, skip_pnl=False, da_cycle=0):
 ###############################################################################
 
+    model_log("e3sm", logger, "{} PRE_RUN_CHECK BEGINS HERE".format(time.strftime("%Y-%m-%d %H:%M:%S")))
     _pre_run_check(case, lid, skip_pnl=skip_pnl, da_cycle=da_cycle)
+    model_log("e3sm", logger, "{} PRE_RUN_CHECK HAS FINISHED".format(time.strftime("%Y-%m-%d %H:%M:%S")))
 
     model = case.get_value("MODEL")
 
@@ -86,55 +79,77 @@ def _run_model_impl(case, lid, skip_pnl=False, da_cycle=0):
     os.environ["OMP_NUM_THREADS"] = str(case.thread_count)
 
     # Run the model
-    logger.info("{} MODEL EXECUTION BEGINS HERE".format(time.strftime("%Y-%m-%d %H:%M:%S")))
-
     cmd = case.get_mpirun_cmd(allow_unresolved_envvars=False)
     logger.info("run command is {} ".format(cmd))
 
     rundir = case.get_value("RUNDIR")
     loop = True
 
+    # MPIRUN_RETRY_REGEX allows the mpi command to be reattempted if the
+    # failure described by that regular expression is matched in the model log
+    # case.spare_nodes is overloaded and may also represent the number of
+    # retries to attempt if ALLOCATE_SPARE_NODES is False
+    retry_run_re = case.get_value("MPIRUN_RETRY_REGEX")
+    node_fail_re = case.get_value("NODE_FAIL_REGEX")
+    retry_count = 0
+    if retry_run_re:
+        retry_run_regex = re.compile(re.escape(retry_run_re))
+        retry_count = case.get_value("MPIRUN_RETRY_COUNT")
+    if node_fail_re:
+        node_fail_regex = re.compile(re.escape(node_fail_re))
+
     while loop:
         loop = False
 
+        model_log("e3sm", logger, "{} SAVE_PRERUN_PROVENANCE BEGINS HERE".format(time.strftime("%Y-%m-%d %H:%M:%S")))
         save_prerun_provenance(case)
+        model_log("e3sm", logger, "{} SAVE_PRERUN_PROVENANCE HAS FINISHED".format(time.strftime("%Y-%m-%d %H:%M:%S")))
+
+        model_log("e3sm", logger, "{} MODEL EXECUTION BEGINS HERE".format(time.strftime("%Y-%m-%d %H:%M:%S")))
         run_func = lambda: run_cmd(cmd, from_dir=rundir)[0]
         stat = run_and_log_case_status(run_func, "model execution", caseroot=case.get_value("CASEROOT"))
+        model_log("e3sm", logger, "{} MODEL EXECUTION HAS FINISHED".format(time.strftime("%Y-%m-%d %H:%M:%S")))
 
         model_logfile = os.path.join(rundir, model + ".log." + lid)
         # Determine if failure was due to a failed node, if so, try to restart
-        if stat != 0:
-            node_fail_re = case.get_value("NODE_FAIL_REGEX")
-            if node_fail_re:
-                node_fail_regex = re.compile(node_fail_re)
-                model_logfile = os.path.join(rundir, model + ".log." + lid)
-                if os.path.exists(model_logfile):
-                    num_fails = len(node_fail_regex.findall(open(model_logfile, 'r').read()))
-                    if num_fails > 0 and case.spare_nodes >= num_fails:
+        if retry_run_re or node_fail_re:
+            model_logfile = os.path.join(rundir, model + ".log." + lid)
+            if os.path.exists(model_logfile):
+                num_node_fails=0
+                num_retry_fails=0
+                if node_fail_re:
+                    num_node_fails = len(node_fail_regex.findall(open(model_logfile, 'r').read()))
+                if retry_run_re:
+                    num_retry_fails = len(retry_run_regex.findall(open(model_logfile, 'r').read()))
+                logger.debug ("RETRY: num_retry_fails {} spare_nodes {} retry_count {}".
+                              format(num_retry_fails, case.spare_nodes, retry_count))
+                if num_node_fails > 0 and case.spare_nodes >= num_node_fails:
                         # We failed due to node failure!
-                        logger.warning("Detected model run failed due to node failure, restarting")
-
-                        # Archive the last consistent set of restart files and restore them
-                        case.case_st_archive(no_resubmit=True)
+                    logger.warning("Detected model run failed due to node failure, restarting")
+                    case.spare_nodes -= num_node_fails
+                    loop = True
+                    case.set_value("CONTINUE_RUN",
+                                   case.get_value("RESUBMIT_SETS_CONTINUE_RUN"))
+                elif num_retry_fails > 0 and retry_count >= num_retry_fails:
+                    logger.warning("Detected model run failed, restarting")
+                    retry_count -= 1
+                    loop = True
+                if loop:
+                    # Archive the last consistent set of restart files and restore them
+                    if case.get_value("DOUT_S"):
+                        case.case_st_archive(resubmit=False)
                         case.restore_from_archive()
 
-                        case.set_value("CONTINUE_RUN",
-                                       case.get_value("RESUBMIT_SETS_CONTINUE_RUN"))
+                    lid = new_lid()
+                    case.create_namelists()
 
-                        lid = new_lid()
-                        loop = True
+        if stat != 0 and not loop:
+            # We failed and we're not restarting
+            expect(False, "RUN FAIL: Command '{}' failed\nSee log file for details: {}".format(cmd, model_logfile))
 
-                        case.create_namelists()
-
-                        case.spare_nodes -= num_fails
-
-            if not loop:
-                # We failed and we're not restarting
-                expect(False, "RUN FAIL: Command '{}' failed\nSee log file for details: {}".format(cmd, model_logfile))
-
-    logger.info("{} MODEL EXECUTION HAS FINISHED".format(time.strftime("%Y-%m-%d %H:%M:%S")))
-
+    model_log("e3sm", logger, "{} POST_RUN_CHECK BEGINS HERE".format(time.strftime("%Y-%m-%d %H:%M:%S")))
     _post_run_check(case, lid)
+    model_log("e3sm", logger, "{} POST_RUN_CHECK HAS FINISHED".format(time.strftime("%Y-%m-%d %H:%M:%S")))
 
     return lid
 
@@ -150,15 +165,24 @@ def _post_run_check(case, lid):
 
     rundir = case.get_value("RUNDIR")
     model = case.get_value("MODEL")
+    driver = case.get_value("COMP_INTERFACE")
+
+    if driver == 'nuopc':
+        file_prefix = 'med'
+    else:
+        file_prefix = 'cpl'
+
     cpl_ninst = 1
     if case.get_value("MULTI_DRIVER"):
         cpl_ninst = case.get_value("NINST_MAX")
     cpl_logs = []
+
     if cpl_ninst > 1:
         for inst in range(cpl_ninst):
-            cpl_logs.append(os.path.join(rundir, "cpl_%04d.log." % (inst+1) + lid))
+            cpl_logs.append(os.path.join(rundir, file_prefix + "_%04d.log." % (inst+1) + lid))
     else:
-        cpl_logs = [os.path.join(rundir, "cpl" + ".log." + lid)]
+        cpl_logs = [os.path.join(rundir, file_prefix + ".log." + lid)]
+
     cpl_logfile = cpl_logs[0]
 
     # find the last model.log and cpl.log
@@ -182,21 +206,13 @@ def _post_run_check(case, lid):
 ###############################################################################
 def _save_logs(case, lid):
 ###############################################################################
-    logdir = case.get_value("LOGDIR")
-    if logdir is not None and len(logdir) > 0:
-        if not os.path.isdir(logdir):
-            os.makedirs(logdir)
+    rundir = case.get_value("RUNDIR")
+    logfiles = glob.glob(os.path.join(rundir, "*.log.{}".format(lid)))
+    for logfile in logfiles:
+        if os.path.isfile(logfile):
+            gzip_existing_file(logfile)
 
-        caseroot = case.get_value("CASEROOT")
-        rundir = case.get_value("RUNDIR")
-        logfiles = glob.glob(os.path.join(rundir, "*.log.{}".format(lid)))
-        for logfile in logfiles:
-            if os.path.isfile(logfile):
-                logfile_gz = gzip_existing_file(logfile)
-                shutil.copy(logfile_gz,
-                            os.path.join(caseroot, logdir, os.path.basename(logfile_gz)))
-
-###############################################################################
+######################################################################################
 def _resubmit_check(case):
 ###############################################################################
 
@@ -217,7 +233,7 @@ def _resubmit_check(case):
     elif dout_s and mach == 'mira':
         caseroot = case.get_value("CASEROOT")
         cimeroot = case.get_value("CIMEROOT")
-        cmd = "ssh cooleylogin1 'cd {}; CIMEROOT={} ./case.submit {} --job case.st_archive'".format(caseroot, cimeroot, caseroot)
+        cmd = "ssh cooleylogin1 'cd {case}; CIMEROOT={root} ./case.submit {case} --job case.st_archive'".format(case=caseroot, root=cimeroot)
         run_cmd(cmd, verbose=True)
 
     if resubmit:
@@ -232,7 +248,7 @@ def _do_external(script_name, caseroot, rundir, lid, prefix):
     filename = "{}.external.log.{}".format(prefix, lid)
     outfile = os.path.join(rundir, filename)
     append_status("Starting script {}".format(script_name), "CaseStatus")
-    run_sub_or_cmd(script_name, [caseroot], (os.path.basename(script_name).split('.',1))[0], [caseroot], logfile=outfile)
+    run_sub_or_cmd(script_name, [caseroot], (os.path.basename(script_name).split('.',1))[0], [caseroot], logfile=outfile) # For sub, use case?
     append_status("Completed script {}".format(script_name), "CaseStatus")
 
 ###############################################################################
@@ -241,11 +257,12 @@ def _do_data_assimilation(da_script, caseroot, cycle, lid, rundir):
     expect(os.path.isfile(da_script), "Data Assimilation script {} not found".format(da_script))
     filename = "da.log.{}".format(lid)
     outfile = os.path.join(rundir, filename)
-    run_sub_or_cmd(da_script, [caseroot, cycle], os.path.basename(da_script), [caseroot, cycle], logfile=outfile)
+    run_sub_or_cmd(da_script, [caseroot, cycle], os.path.basename(da_script), [caseroot, cycle], logfile=outfile) # For sub, use case?
 
 ###############################################################################
-def case_run(self, skip_pnl=False):
+def case_run(self, skip_pnl=False, set_continue_run=False, submit_resubmits=False):
 ###############################################################################
+    model_log("e3sm", logger, "{} CASE.RUN BEGINS HERE".format(time.strftime("%Y-%m-%d %H:%M:%S")))
     # Set up the run, run the model, do the postrun steps
     prerun_script = self.get_value("PRERUN_SCRIPT")
     postrun_script = self.get_value("POSTRUN_SCRIPT")
@@ -255,14 +272,18 @@ def case_run(self, skip_pnl=False):
     data_assimilation = (data_assimilation_cycles > 0 and
                          len(data_assimilation_script) > 0 and
                          os.path.isfile(data_assimilation_script))
+
+
     # set up the LID
     lid = new_lid()
 
     if prerun_script:
+        model_log("e3sm", logger, "{} PRERUN_SCRIPT BEGINS HERE".format(time.strftime("%Y-%m-%d %H:%M:%S")))
         self.flush()
         _do_external(prerun_script, self.get_value("CASEROOT"), self.get_value("RUNDIR"),
                     lid, prefix="prerun")
         self.read_xml()
+        model_log("e3sm", logger, "{} PRERUN_SCRIPT HAS FINISHED".format(time.strftime("%Y-%m-%d %H:%M:%S")))
 
     for cycle in range(data_assimilation_cycles):
         # After the first DA cycle, runs are restart runs
@@ -271,30 +292,46 @@ def case_run(self, skip_pnl=False):
             self.set_value("CONTINUE_RUN",
                            self.get_value("RESUBMIT_SETS_CONTINUE_RUN"))
 
+        model_log("e3sm", logger, "{} RUN_MODEL BEGINS HERE".format(time.strftime("%Y-%m-%d %H:%M:%S")))
         lid = _run_model(self, lid, skip_pnl, da_cycle=cycle)
-
+        model_log("e3sm", logger, "{} RUN_MODEL HAS FINISHED".format(time.strftime("%Y-%m-%d %H:%M:%S")))
         if self.get_value("CHECK_TIMING") or self.get_value("SAVE_TIMING"):
+            model_log("e3sm", logger, "{} GET_TIMING BEGINS HERE".format(time.strftime("%Y-%m-%d %H:%M:%S")))
             get_timing(self, lid)     # Run the getTiming script
+            model_log("e3sm", logger, "{} GET_TIMING HAS FINISHED".format(time.strftime("%Y-%m-%d %H:%M:%S")))
+
 
         if data_assimilation:
+            model_log("e3sm", logger, "{} DO_DATA_ASSIMILATION BEGINS HERE".format(time.strftime("%Y-%m-%d %H:%M:%S")))
             self.flush()
             _do_data_assimilation(data_assimilation_script, self.get_value("CASEROOT"), cycle, lid,
                                  self.get_value("RUNDIR"))
             self.read_xml()
+            model_log("e3sm", logger, "{} DO_DATA_ASSIMILATION HAS FINISHED".format(time.strftime("%Y-%m-%d %H:%M:%S")))
 
         _save_logs(self, lid)       # Copy log files back to caseroot
 
+        model_log("e3sm", logger, "{} SAVE_POSTRUN_PROVENANCE BEGINS HERE".format(time.strftime("%Y-%m-%d %H:%M:%S")))
         save_postrun_provenance(self)
+        model_log("e3sm", logger, "{} SAVE_POSTRUN_PROVENANCE HAS FINISHED".format(time.strftime("%Y-%m-%d %H:%M:%S")))
 
     if postrun_script:
+        model_log("e3sm", logger, "{} POSTRUN_SCRIPT BEGINS HERE".format(time.strftime("%Y-%m-%d %H:%M:%S")))
         self.flush()
         _do_external(postrun_script, self.get_value("CASEROOT"), self.get_value("RUNDIR"),
                     lid, prefix="postrun")
         self.read_xml()
+        _save_logs(self, lid)
+        model_log("e3sm", logger, "{} POSTRUN_SCRIPT HAS FINISHED".format(time.strftime("%Y-%m-%d %H:%M:%S")))
 
-    _save_logs(self, lid)       # Copy log files back to caseroot
+    if set_continue_run:
+        self.set_value("CONTINUE_RUN",
+                       self.get_value("RESUBMIT_SETS_CONTINUE_RUN"))
 
     logger.warning("check for resubmit")
-    _resubmit_check(self)
+    if submit_resubmits:
+        _resubmit_check(self)
+
+    model_log("e3sm", logger, "{} CASE.RUN HAS FINISHED".format(time.strftime("%Y-%m-%d %H:%M:%S")))
 
     return True

@@ -63,6 +63,7 @@ module prep_ocn_mod
   public :: prep_ocn_get_mapper_Rg2o_liq
   public :: prep_ocn_get_mapper_Rg2o_ice
   public :: prep_ocn_get_mapper_Sw2o
+  public :: prep_ocn_get_mapper_Sg2o
 
   !--------------------------------------------------------------------------
   ! Private interfaces
@@ -85,6 +86,7 @@ module prep_ocn_mod
   type(seq_map), pointer :: mapper_Rg2o_liq
   type(seq_map), pointer :: mapper_Rg2o_ice
   type(seq_map), pointer :: mapper_Sw2o
+  type(seq_map), pointer :: mapper_Sg2o
 
   ! attribute vectors
   type(mct_aVect), pointer :: a2x_ox(:) ! Atm export, ocn grid, cpl pes
@@ -182,6 +184,7 @@ contains
     allocate(mapper_Rg2o_liq)
     allocate(mapper_Rg2o_ice)
     allocate(mapper_Sw2o)
+    allocate(mapper_Sg2o)
 
     if (ocn_present) then
 
@@ -284,7 +287,7 @@ contains
 
           if (iamroot_CPLID) then
              write(logunit,*) ' '
-             write(logunit,F00) 'Initializing mapper_Va2o vect'
+             write(logunit,F00) 'Initializing mapper_Va2o vect with vect_map = ',trim(vect_map)
           end if
           call seq_map_initvect(mapper_Va2o, vect_map, atm(1), ocn(1), string='mapper_Va2o initvect')
        endif
@@ -345,6 +348,14 @@ contains
           call seq_map_init_rcfile(mapper_Rg2o_ice, glc(1), ocn(1), &
                'seq_maps.rc', 'glc2ocn_ice_rmapname:', 'glc2ocn_ice_rmaptype:',samegrid_og, &
                'mapper_Rg2o_ice initialization',esmf_map_flag)
+
+          if (iamroot_CPLID) then
+             write(logunit,*) ' '
+             write(logunit,F00) 'Initializing mapper_Sg2o'
+          end if
+          call seq_map_init_rcfile(mapper_Sg2o, glc(1), ocn(1), &
+               'seq_maps.rc', 'glc2ocn_smapname:', 'glc2ocn_smaptype:',samegrid_og, &
+               'mapper_Sg2o initialization',esmf_map_flag)
        endif
        call shr_sys_flush(logunit)
 
@@ -566,6 +577,7 @@ contains
     integer, save :: index_r2x_Flrr_flood
     integer, save :: index_g2x_Fogg_rofl
     integer, save :: index_g2x_Fogg_rofi
+    integer, save :: index_g2x_Sg_thck
     integer, save :: index_x2o_Foxx_swnet
     integer, save :: index_x2o_Faxa_snow
     integer, save :: index_x2o_Faxa_rain
@@ -611,6 +623,7 @@ contains
     type(mct_aVect_sharedindices),save :: r2x_sharedindices
     type(mct_aVect_sharedindices),save :: w2x_sharedindices
     type(mct_aVect_sharedindices),save :: xao_sharedindices
+    type(mct_aVect_sharedindices),save :: g2o_sharedindices
     logical, save :: first_time = .true.
     character(*),parameter :: subName = '(prep_ocn_merge) '
     !-----------------------------------------------------------------------
@@ -645,6 +658,7 @@ contains
        index_r2x_Flrr_flood     = mct_aVect_indexRA(r2x_o,'Flrr_flood')
        index_g2x_Fogg_rofl      = mct_aVect_indexRA(g2x_o,'Fogg_rofl')
        index_g2x_Fogg_rofi      = mct_aVect_indexRA(g2x_o,'Fogg_rofi')
+       index_g2x_Sg_thck        = mct_aVect_indexRA(g2x_o,'Sg_thck')
        index_x2o_Faxa_snow      = mct_aVect_indexRA(x2o_o,'Faxa_snow')
        index_x2o_Faxa_rain      = mct_aVect_indexRA(x2o_o,'Faxa_rain')
        index_x2o_Faxa_prec      = mct_aVect_indexRA(x2o_o,'Faxa_prec')
@@ -752,6 +766,7 @@ contains
        call mct_aVect_setSharedIndices(r2x_o, x2o_o, r2x_SharedIndices)
        call mct_aVect_setSharedIndices(w2x_o, x2o_o, w2x_SharedIndices)
        call mct_aVect_setSharedIndices(xao_o, x2o_o, xao_SharedIndices)
+       call mct_aVect_setSharedIndices(g2x_o, x2o_o, g2o_SharedIndices)
 
        do ko = 1,noflds
           !--- document merge ---
@@ -888,6 +903,7 @@ contains
     call mct_aVect_copy(aVin=r2x_o, aVout=x2o_o, vector=mct_usevector, sharedIndices=r2x_SharedIndices)
     call mct_aVect_copy(aVin=w2x_o, aVout=x2o_o, vector=mct_usevector, sharedIndices=w2x_SharedIndices)
     call mct_aVect_copy(aVin=xao_o, aVout=x2o_o, vector=mct_usevector, sharedIndices=xao_SharedIndices)
+    call mct_aVect_copy(aVin=g2x_o, aVout=x2o_o, vector=mct_usevector, sharedIndices=g2o_SharedIndices)
 
     !--- document manual merges ---
     if (first_time) then
@@ -1167,8 +1183,13 @@ contains
 
        call seq_map_map(mapper_Fa2o, a2x_ax, a2x_ox(eai), fldlist=seq_flds_a2x_fluxes, norm=.true.)
 
+#ifdef COMPARE_TO_NUOPC
+       call seq_map_mapvect(mapper_Va2o, vect_map, a2x_ax, a2x_ox(eai), 'Sa_u', 'Sa_v', norm=.true.)
+#else 
        !--- tcx the norm should be true below, it's false for bfb backwards compatability
        call seq_map_mapvect(mapper_Va2o, vect_map, a2x_ax, a2x_ox(eai), 'Sa_u', 'Sa_v', norm=.false.)
+#endif
+
     enddo
     call t_drvstopf  (trim(timer))
 
@@ -1257,6 +1278,9 @@ contains
 
        call seq_map_map(mapper_Rg2o_ice, g2x_gx, g2x_ox(egi), &
             fldlist=seq_flds_g2o_ice_fluxes, norm=.false.)
+
+       call seq_map_map(mapper_Sg2o, g2x_gx, g2x_ox(egi), &
+            fldlist=seq_flds_g2x_states_to_ocn, norm=.false.)
     enddo
     call t_drvstopf  (trim(timer))
   end subroutine prep_ocn_calc_g2x_ox
@@ -1371,5 +1395,10 @@ contains
     type(seq_map), pointer :: prep_ocn_get_mapper_Sw2o
     prep_ocn_get_mapper_Sw2o => mapper_Sw2o
   end function prep_ocn_get_mapper_Sw2o
+
+  function prep_ocn_get_mapper_Sg2o()
+    type(seq_map), pointer :: prep_ocn_get_mapper_Sg2o
+    prep_ocn_get_mapper_Sg2o => mapper_Sg2o
+  end function prep_ocn_get_mapper_Sg2o
 
 end module prep_ocn_mod
