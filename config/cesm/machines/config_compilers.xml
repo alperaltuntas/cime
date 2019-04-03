@@ -631,6 +631,7 @@ using a fortran linker.
 <compiler MACH="constance" COMPILER="pgi">
   <CFLAGS>
     <append DEBUG="FALSE"> -O2 </append>
+  </CFLAGS>
   <CONFIG_ARGS>
     <base> --host=Linux </base>
   </CONFIG_ARGS>
