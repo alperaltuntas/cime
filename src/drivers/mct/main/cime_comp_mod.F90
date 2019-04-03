@@ -37,6 +37,7 @@ module cime_comp_mod
   use shr_orb_mod,       only: shr_orb_params
   use shr_frz_mod,       only: shr_frz_freezetemp_init
   use shr_reprosum_mod,  only: shr_reprosum_setopts
+  use shr_taskmap_mod,   only: shr_taskmap_write
   use mct_mod            ! mct_ wrappers for mct lib
   use perf_mod
   use ESMF
@@ -59,7 +60,7 @@ module cime_comp_mod
   !----------------------------------------------------------------------------
 
   ! mpi comm data & routines, plus logunit and loglevel
-  use seq_comm_mct, only: CPLID, GLOID, logunit, loglevel
+  use seq_comm_mct, only: CPLID, GLOID, logunit, loglevel, info_taskmap_comp
   use seq_comm_mct, only: ATMID, LNDID, OCNID, ICEID, GLCID, ROFID, WAVID, ESPID
   use seq_comm_mct, only: ALLATMID,ALLLNDID,ALLOCNID,ALLICEID,ALLGLCID,ALLROFID,ALLWAVID,ALLESPID
   use seq_comm_mct, only: CPLALLATMID,CPLALLLNDID,CPLALLOCNID,CPLALLICEID
@@ -635,6 +636,10 @@ contains
     character(len=seq_comm_namelen) :: comp_name(num_inst_total)
     integer :: it
     integer :: driver_comm
+    integer :: npes_CPLID
+    logical :: verbose_taskmap_output
+    character(len=8) :: c_cpl_inst    ! coupler instance number
+    character(len=8) :: c_cpl_npes    ! number of pes in coupler
 
     call mpi_init(ierr)
     call shr_mpi_chkerr(ierr,subname//' mpi_init')
@@ -673,8 +678,8 @@ contains
     if (iamroot_GLOID) output_perf = .true.
 
     call seq_comm_getinfo(CPLID,mpicom=mpicom_CPLID,&
-         iamroot=iamroot_CPLID,nthreads=nthreads_CPLID,&
-         iam=comp_comm_iam(it))
+         iamroot=iamroot_CPLID,npes=npes_CPLID, &
+         nthreads=nthreads_CPLID,iam=comp_comm_iam(it))
     if (iamroot_CPLID) output_perf = .true.
 
     comp_id(it)    = CPLID
@@ -792,6 +797,42 @@ contains
     else
        loglevel = 0
        call shr_file_setLogLevel(loglevel)
+    endif
+
+    !----------------------------------------------------------
+    !| Output task-to-node mapping data for coupler
+    !----------------------------------------------------------
+
+    if (info_taskmap_comp > 0) then
+       ! Identify SMP nodes and process/SMP mapping for the coupler.
+       ! (Assume that processor names are SMP node names on SMP clusters.)
+
+       if (iamin_CPLID) then
+
+          if (info_taskmap_comp == 1) then
+            verbose_taskmap_output = .false.
+          else
+            verbose_taskmap_output = .true.
+          endif
+
+          write(c_cpl_inst,'(i8)') num_inst_driver
+
+          if (iamroot_CPLID) then
+             write(c_cpl_npes,'(i8)') npes_CPLID
+             write(logunit,'(3A)') trim(adjustl(c_cpl_npes)), &
+                                   ' pes participating in computation of CPL instance #', &
+                                   trim(adjustl(c_cpl_inst))
+             call shr_sys_flush(logunit)
+          endif
+
+          call t_startf("shr_taskmap_write")
+          call shr_taskmap_write(logunit, mpicom_CPLID,                &
+                                 'CPL #'//trim(adjustl(c_cpl_inst)),   &
+                                 verbose=verbose_taskmap_output        )
+          call t_stopf("shr_taskmap_write")
+
+       endif
+
     endif
 
     !----------------------------------------------------------
@@ -1097,7 +1138,7 @@ contains
     ! Initialize freezing point calculation for all components
     !----------------------------------------------------------
 
-    call shr_frz_freezetemp_init(tfreeze_option)
+    call shr_frz_freezetemp_init(tfreeze_option, iamroot_GLOID)
 
     if (trim(orb_mode) == trim(seq_infodata_orb_variable_year)) then
        call seq_timemgr_EClockGetData( EClock_d, curr_ymd=ymd)
@@ -2489,7 +2530,7 @@ contains
        !| GLC SETUP-SEND
        !----------------------------------------------------------
        if (glc_present .and. glcrun_alarm) then
-          call cime_run_glc_setup_send()
+          call cime_run_glc_setup_send(lnd2glc_averaged_now)
        endif
 
        !----------------------------------------------------------
@@ -3730,7 +3771,9 @@ contains
 
 !----------------------------------------------------------------------------------
 
-  subroutine cime_run_glc_setup_send()
+  subroutine cime_run_glc_setup_send(lnd2glc_averaged_now)
+
+    logical, intent(inout) :: lnd2glc_averaged_now ! Set to .true. if lnd2glc averages were taken this timestep (otherwise left unchanged)
 
     !----------------------------------------------------
     !| glc prep-merge
@@ -3744,6 +3787,7 @@ contains
           if (lnd_c2_glc) then
           ! NOTE - only create appropriate input to glc if the avg_alarm is on
              call prep_glc_accum_avg(timer='CPL:glcprep_avg')
+             lnd2glc_averaged_now = .true.
 
              ! Note that l2x_gx is obtained from mapping the module variable l2gacc_lx
              call prep_glc_calc_l2x_gx(fractions_lx, timer='CPL:glcprep_lnd2glc')
@@ -4171,11 +4215,6 @@ contains
     !----------------------------------------------------------
     ! Write history file, only AVs on CPLID
     !----------------------------------------------------------
-
-    ! local variables
-    logical            :: lnd2glc_averaged_now  ! Whether lnd2glc averages were taken this timestep
-    type(ESMF_Time)    :: etime_curr            ! Current model time
-    real(r8)           :: tbnds1_offset         ! Time offset for call to seq_hist_writeaux
 
     if (iamin_CPLID) then
 

@@ -235,7 +235,7 @@
 
   <entry id="RUN_REFDIR">
     <type>char</type>
-    <default_value>ccsm4_init</default_value>
+    <default_value>cesm2_init</default_value>
     <group>run_begin_stop_restart</group>
     <file>env_run.xml</file>
     <desc>
@@ -1500,10 +1500,11 @@
 
   <entry id="ROF2OCN_FMAPNAME">
     <type>char</type>
-    <default_value>idmap</default_value>
+    <default_value>idmap_ignore</default_value>
     <group>run_domain</group>
     <file>env_run.xml</file>
-    <desc>rof2ocn flux mapping file</desc>
+    <desc>rof2ocn flux mapping file - the default value idmap_ignore, if set, will be ignored by buildnml and
+    will generate a runtime error if in fact a file is required for the given compset</desc>
   </entry>
 
   <entry id="ROF2OCN_FMAPTYPE">
@@ -1585,10 +1586,11 @@
 
   <entry id="GLC2ICE_RMAPNAME">
     <type>char</type>
-    <default_value>idmap</default_value>
+    <default_value>idmap_ignore</default_value>
     <group>run_domain</group>
     <file>env_run.xml</file>
-    <desc>glc2ice runoff mapping file</desc>
+    <desc>glc2ice runoff mapping file - the default value idmap_ignore, if set, will be ignored by buildnml and
+    will generate a runtime error if in fact a file is required for the given compset</desc>
   </entry>
 
   <entry id="GLC2ICE_RMAPTYPE">
@@ -1602,10 +1604,11 @@
 
   <entry id="GLC2OCN_LIQ_RMAPNAME">
     <type>char</type>
-    <default_value>idmap</default_value>
+    <default_value>idmap_ignore</default_value>
     <group>run_domain</group>
     <file>env_run.xml</file>
-    <desc>glc2ocn runoff mapping file for liquid runoff</desc>
+    <desc>glc2ocn runoff mapping file for liquid runoff - the default value idmap_ignore, if set, will be ignored by buildnml and
+    will generate a runtime error if in fact a file is required for the given compset</desc>
   </entry>
 
   <entry id="GLC2OCN_LIQ_RMAPTYPE">
@@ -1619,10 +1622,11 @@
 
   <entry id="GLC2OCN_ICE_RMAPNAME">
     <type>char</type>
-    <default_value>idmap</default_value>
+    <default_value>idmap_ignore</default_value>
     <group>run_domain</group>
     <file>env_run.xml</file>
-    <desc>glc2ocn runoff mapping file for ice runoff</desc>
+    <desc>glc2ocn runoff mapping file for ice runoff - the default value idmap_ignore, if set, will be ignored by buildnml and
+    will generate a runtime error if in fact a file is required for the given compset</desc>
   </entry>
 
   <entry id="GLC2OCN_ICE_RMAPTYPE">
