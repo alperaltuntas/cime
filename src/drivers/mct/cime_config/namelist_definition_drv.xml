@@ -137,6 +137,19 @@
     </values>
   </entry>
 
+  <entry id="flds_co2g">
+    <type>logical</type>
+    <category>seq_flds</category>
+    <group>seq_cplflds_inparm</group>
+    <desc>
+      If set to .true. fields will be passed back and forth between the ocean and glc
+      via the coupler.
+    </desc>
+    <values>
+      <value>$OCN_C2_GLC</value>
+    </values>
+  </entry>
+
   <entry  id="flds_wiso" modify_via_xml="FLDS_WISO">
     <type>logical</type>
     <category>seq_flds</category>
