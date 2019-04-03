@@ -194,7 +194,11 @@ module seq_flds_mod
   character(CXX) :: seq_flds_g2o_liq_fluxes
   character(CXX) :: seq_flds_g2o_ice_fluxes
   character(CXX) :: seq_flds_x2g_states
+  character(CXX) :: seq_flds_x2g_states_from_lnd
+  character(CXX) :: seq_flds_x2g_states_from_ocn
   character(CXX) :: seq_flds_x2g_fluxes
+  character(CXX) :: seq_flds_x2g_fluxes_from_lnd
+  character(CXX) :: seq_flds_x2g_fluxes_from_ocn
 
   character(CXX) :: seq_flds_w2x_states
   character(CXX) :: seq_flds_w2x_fluxes
@@ -234,6 +238,8 @@ module seq_flds_mod
   character(CXX) :: seq_flds_g2x_fields
   character(CXX) :: seq_flds_g2x_fields_to_lnd
   character(CXX) :: seq_flds_x2g_fields
+  character(CXX) :: seq_flds_x2g_fields_from_lnd
+  character(CXX) :: seq_flds_x2g_fields_from_ocn
   character(CXX) :: seq_flds_w2x_fields
   character(CXX) :: seq_flds_x2w_fields
 
@@ -315,7 +321,11 @@ contains
     character(CXX) :: g2o_liq_fluxes = ''
     character(CXX) :: g2o_ice_fluxes = ''
     character(CXX) :: x2g_states = ''
+    character(CXX) :: x2g_states_from_lnd = ''
+    character(CXX) :: x2g_states_from_ocn = ''
     character(CXX) :: x2g_fluxes = ''
+    character(CXX) :: x2g_fluxes_from_lnd = ''
+    character(CXX) :: x2g_fluxes_from_ocn = ''
     character(CXX) :: xao_albedo = ''
     character(CXX) :: xao_states = ''
     character(CXX) :: xao_fluxes = ''
@@ -342,6 +352,7 @@ contains
     logical :: flds_co2a
     logical :: flds_co2b
     logical :: flds_co2c
+    logical :: flds_co2g
     logical :: flds_co2_dmsa
     logical :: flds_bgc_oi
     logical :: flds_wiso
@@ -349,7 +360,8 @@ contains
 
     namelist /seq_cplflds_inparm/  &
          flds_co2a, flds_co2b, flds_co2c, flds_co2_dmsa, flds_wiso, glc_nec, &
-         ice_ncat, seq_flds_i2o_per_cat, flds_bgc_oi, nan_check_component_fields
+         ice_ncat, seq_flds_i2o_per_cat, flds_bgc_oi, nan_check_component_fields, &
+         flds_co2g
 
     ! user specified new fields
     integer,  parameter :: nfldmax = 200
@@ -377,6 +389,7 @@ contains
        flds_co2a = .false.
        flds_co2b = .false.
        flds_co2c = .false.
+       flds_co2g = .false.
        flds_co2_dmsa = .false.
        flds_bgc_oi   = .false.
        flds_wiso = .false.
@@ -403,6 +416,7 @@ contains
     call shr_mpi_bcast(flds_co2a    , mpicom)
     call shr_mpi_bcast(flds_co2b    , mpicom)
     call shr_mpi_bcast(flds_co2c    , mpicom)
+    call shr_mpi_bcast(flds_co2g    , mpicom)
     call shr_mpi_bcast(flds_co2_dmsa, mpicom)
     call shr_mpi_bcast(flds_bgc_oi  , mpicom)
     call shr_mpi_bcast(flds_wiso    , mpicom)
@@ -1529,13 +1543,16 @@ contains
     call metadata_set(attname, longname, stdname, units)
 
     ! Melt rate
-    call seq_flds_add(o2x_fluxes,"Fogo_mr")
-    call seq_flds_add(x2g_fluxes,"Fogo_mr")
-    longname = 'Basal melt rate'
-    stdname  = 'basal_melt_rate'
-    units    = 'kg/m^2/s'
-    attname  = 'Fogo_mr'
-    call metadata_set(attname, longname, stdname, units)
+    if (trim(cime_model) == 'cesm' .and. flds_co2g) then
+       call seq_flds_add(o2x_fluxes,"Fogo_mr")
+       call seq_flds_add(x2g_fluxes,"Fogo_mr")
+       call seq_flds_add(x2g_fluxes_from_ocn,"Fogo_mr")
+       longname = 'Basal melt rate'
+       stdname  = 'basal_melt_rate'
+       units    = 'kg/m^2/s'
+       attname  = 'Fogo_mr'
+       call metadata_set(attname, longname, stdname, units)
+    endif
 
     call seq_flds_add(xao_states,"So_fswpen")
     call seq_flds_add(o2x_states,"So_fswpen")
@@ -2340,6 +2357,7 @@ contains
     call set_glc_elevclass_field(name, attname, longname, stdname, units, l2x_fluxes_to_glc, &
          additional_list = .true.)
     call seq_flds_add(x2g_fluxes,trim(name))
+    call seq_flds_add(x2g_fluxes_from_lnd,trim(name))
     call metadata_set(attname, longname, stdname, units)
 
     name = 'Sl_tsrf'
@@ -2351,6 +2369,7 @@ contains
     call set_glc_elevclass_field(name, attname, longname, stdname, units, l2x_states_to_glc, &
          additional_list = .true.)
     call seq_flds_add(x2g_states,trim(name))
+    call seq_flds_add(x2g_states_from_lnd,trim(name))
     call metadata_set(attname, longname, stdname, units)
 
     ! Sl_topo is sent from lnd -> cpl, but is NOT sent to glc (it is only used for the
@@ -2393,15 +2412,17 @@ contains
     call set_glc_elevclass_field(name, attname, longname, stdname, units, x2l_states_from_glc, &
          additional_list = .true.)
 
-    name = 'Sg_thck'
-    longname = 'Ice thickness of glacier'
-    stdname  = 'ice_thickness'
-    units    = 'm'
-    attname  = 'Sg_thck'
-    call metadata_set(attname, longname, stdname, units)
-    call seq_flds_add(g2x_states,"Sg_thck")
-    call seq_flds_add(x2o_states,"Sg_thck")
-    call seq_flds_add(g2x_states_to_ocn,"Sg_thck")
+    if (trim(cime_model) == 'cesm' .and. flds_co2g) then
+       name = 'Sg_thck'
+       longname = 'Ice thickness of glacier'
+       stdname  = 'ice_thickness'
+       units    = 'm'
+       attname  = 'Sg_thck'
+       call metadata_set(attname, longname, stdname, units)
+       call seq_flds_add(g2x_states,"Sg_thck")
+       call seq_flds_add(x2o_states,"Sg_thck")
+       call seq_flds_add(g2x_states_to_ocn,"Sg_thck")
+    endif
 
     name = 'Flgg_hflx'
     longname = 'Downward heat flux from glacier interior'
@@ -3241,6 +3262,8 @@ contains
     seq_flds_g2x_states_to_lnd = trim(g2x_states_to_lnd)
     seq_flds_g2x_states_to_ocn = trim(g2x_states_to_ocn)
     seq_flds_x2g_states = trim(x2g_states)
+    seq_flds_x2g_states_from_lnd = trim(x2g_states_from_lnd)
+    seq_flds_x2g_states_from_ocn = trim(x2g_states_from_ocn)
     seq_flds_xao_states = trim(xao_states)
     seq_flds_xao_albedo = trim(xao_albedo)
     seq_flds_xao_diurnl = trim(xao_diurnl)
@@ -3265,6 +3288,8 @@ contains
     seq_flds_g2o_liq_fluxes = trim(g2o_liq_fluxes)
     seq_flds_g2o_ice_fluxes = trim(g2o_ice_fluxes)
     seq_flds_x2g_fluxes = trim(x2g_fluxes)
+    seq_flds_x2g_fluxes_from_lnd = trim(x2g_fluxes_from_lnd)
+    seq_flds_x2g_fluxes_from_ocn = trim(x2g_fluxes_from_ocn)
     seq_flds_xao_fluxes = trim(xao_fluxes)
     seq_flds_r2x_fluxes = trim(r2x_fluxes)
     seq_flds_x2r_fluxes = trim(x2r_fluxes)
@@ -3322,6 +3347,8 @@ contains
     call catFields(seq_flds_g2x_fields, seq_flds_g2x_states, seq_flds_g2x_fluxes)
     call catFields(seq_flds_g2x_fields_to_lnd, seq_flds_g2x_states_to_lnd, seq_flds_g2x_fluxes_to_lnd)
     call catFields(seq_flds_x2g_fields, seq_flds_x2g_states, seq_flds_x2g_fluxes)
+    call catFields(seq_flds_x2g_fields_from_lnd, seq_flds_x2g_states_from_lnd, seq_flds_x2g_fluxes_from_lnd)
+    call catFields(seq_flds_x2g_fields_from_ocn, seq_flds_x2g_states_from_ocn, seq_flds_x2g_fluxes_from_ocn)
     call catFields(seq_flds_xao_fields, seq_flds_xao_albedo, seq_flds_xao_states)
     call catFields(stringtmp          , seq_flds_xao_fields, seq_flds_xao_fluxes)
     call catFields(seq_flds_xao_fields, stringtmp          , seq_flds_xao_diurnl)
