@@ -3630,6 +3630,8 @@ contains
        call component_diag(infodata, ocn, flow='c2x', comment= 'recv ocn', &
             info_debug=info_debug, timer_diag='CPL:ocnpost_diagav')
 
+       if (ocn_c2_glc) call prep_glc_accum_o2g(timer='CPL:ocnpost_acco2g' )
+
        if (drv_threading) call seq_comm_setnthreads(nthreads_GLOID)
        call t_drvstopf  ('CPL:OCNPOSTT',cplrun=.true.)
     endif
@@ -3760,7 +3762,7 @@ contains
 
        ! Accumulate rof and glc inputs (module variables in prep_rof_mod and prep_glc_mod)
        if (lnd_c2_rof) call prep_rof_accum(timer='CPL:lndpost_accl2r')
-       if (lnd_c2_glc) call prep_glc_accum(timer='CPL:lndpost_accl2g' )
+       if (lnd_c2_glc) call prep_glc_accum_l2g(timer='CPL:lndpost_accl2g' )
 
        if (drv_threading) call seq_comm_setnthreads(nthreads_GLOID)
        call t_drvstopf  ('CPL:LNDPOST',cplrun=.true.)
@@ -3785,13 +3787,13 @@ contains
        if (glcrun_avg_alarm) then
           if (lnd_c2_glc) then
           ! NOTE - only create appropriate input to glc if the avg_alarm is on
-             call prep_glc_accum_avg(timer='CPL:glcprep_avg')
+             call prep_glc_accum_l2g_avg(timer='CPL:glcprep_l2g_avg')
              lnd2glc_averaged_now = .true.
 
              ! Note that l2x_gx is obtained from mapping the module variable l2gacc_lx
              call prep_glc_calc_l2x_gx(fractions_lx, timer='CPL:glcprep_lnd2glc')
 
-             call prep_glc_mrg(infodata, fractions_gx, timer_mrg='CPL:glcprep_mrgx2g')
+             call prep_glc_mrg_l2g(infodata, fractions_gx, timer_mrg='CPL:glcprep_mrgx2g')
 
              call component_diag(infodata, glc, flow='x2c', comment='send glc', &
                   info_debug=info_debug, timer_diag='CPL:glcprep_diagav')
@@ -3799,6 +3801,7 @@ contains
           end if  ! lnd_c2_glc
 
           if (ocn_c2_glc) then
+             call prep_glc_accum_o2g_avg(timer='CPL:glcprep_o2g_avg')
              call prep_glc_calc_o2x_gx(fractions_ox, timer='CPL:glcprep_ocn2glc')
              call prep_glc_mrg_o2g(infodata, fractions_gx, timer_mrg='CPL:glcprep_mrgx2g')
           end if  ! ocn_c2_glc

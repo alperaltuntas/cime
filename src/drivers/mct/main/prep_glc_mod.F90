@@ -30,11 +30,13 @@ module prep_glc_mod
   !--------------------------------------------------------------------------
 
   public :: prep_glc_init
-  public :: prep_glc_mrg
+  public :: prep_glc_mrg_l2g
   public :: prep_glc_mrg_o2g
 
-  public :: prep_glc_accum
-  public :: prep_glc_accum_avg
+  public :: prep_glc_accum_l2g
+  public :: prep_glc_accum_o2g
+  public :: prep_glc_accum_l2g_avg
+  public :: prep_glc_accum_o2g_avg
 
   public :: prep_glc_calc_o2x_gx
   public :: prep_glc_calc_l2x_gx
@@ -55,7 +57,7 @@ module prep_glc_mod
 
   private :: prep_glc_do_renormalize_smb
   private :: prep_glc_set_g2x_lx_fields
-  private :: prep_glc_merge
+  private :: prep_glc_merge_l2g
   private :: prep_glc_merge_o2g
   private :: prep_glc_map_one_state_field_lnd2glc
   private :: prep_glc_map_qice_conservative_lnd2glc
@@ -77,7 +79,9 @@ module prep_glc_mod
 
   ! accumulation variables
   type(mct_aVect), pointer :: l2gacc_lx(:) ! Lnd export, lnd grid, cpl pes - allocated in driver
+  type(mct_aVect), pointer :: o2gacc_ox(:) ! Ocn export, ocn grid, cpl pes - allocated in driver
   integer        , target :: l2gacc_lx_cnt ! l2gacc_lx: number of time samples accumulated
+  integer        , target :: o2gacc_ox_cnt ! o2gacc_ox: number of time samples accumulated
 
   ! other module variables
   integer :: mpicom_CPLID  ! MPI cpl communicator
@@ -89,9 +93,6 @@ module prep_glc_mod
 
   ! Name of flux field giving surface mass balance
   character(len=*), parameter :: qice_fieldname = 'Flgl_qice'
-
-  ! Melt rate passed from ocn
-  character(len=*), parameter :: mr_fieldname = 'Fogo_mr'
 
   ! Names of some other fields
   character(len=*), parameter :: Sg_frac_field = 'Sg_ice_covered'
@@ -123,6 +124,7 @@ contains
     integer                          :: eli, eoi
     integer                          :: lsize_l
     integer                          :: lsize_g
+    integer                          :: lsize_o
     logical                          :: samegrid_lg   ! samegrid land and glc
     logical                          :: samegrid_og   ! samegrid ocn and glc
     logical                          :: esmf_map_flag ! .true. => use esmf for mapping
@@ -133,6 +135,7 @@ contains
     character(CL)                    :: glc_gnam      ! glc grid
     type(mct_avect), pointer         :: l2x_lx
     type(mct_avect), pointer         :: x2g_gx
+    type(mct_avect), pointer         :: o2x_ox
     character(*), parameter          :: subname = '(prep_glc_init)'
     character(*), parameter          :: F00 = "('"//subname//" : ', 4A )"
     !---------------------------------------------------------------
@@ -167,7 +170,7 @@ contains
           allocate(l2x_gx(num_inst_lnd))
           allocate(l2gacc_lx(num_inst_lnd))
           do eli = 1,num_inst_lnd
-             call mct_aVect_init(l2x_gx(eli), rList=seq_flds_x2g_fields, lsize=lsize_g)
+             call mct_aVect_init(l2x_gx(eli), rList=seq_flds_x2g_fields_from_lnd, lsize=lsize_g)
              call mct_aVect_zero(l2x_gx(eli))
 
              call mct_aVect_init(l2gacc_lx(eli), rList=seq_flds_l2x_fields_to_glc, lsize=lsize_l)
@@ -207,18 +210,25 @@ contains
 
           call prep_glc_set_g2x_lx_fields()
        end if
-       call shr_sys_flush(logunit)
 
        if (ocn_c2_glc) then
 
           samegrid_og = .true.
           if (trim(ocn_gnam) /= trim(glc_gnam)) samegrid_og = .false.
 
+          o2x_ox => component_get_c2x_cx(ocn(1))
+          lsize_o = mct_aVect_lsize(o2x_ox)
+
           allocate(o2x_gx(num_inst_ocn))
+          allocate(o2gacc_ox(num_inst_lnd))
           do eoi = 1, num_inst_ocn
-            call mct_aVect_init(o2x_gx(eoi), rList=seq_flds_o2x_fields, lsize=lsize_g)
+            call mct_aVect_init(o2x_gx(eoi), rList=seq_flds_x2g_fields_from_ocn, lsize=lsize_g)
             call mct_aVect_zero(o2x_gx(eoi))
+
+            call mct_aVect_init(o2gacc_ox(eoi), rList=seq_flds_x2g_fields_from_ocn, lsize=lsize_o)
+            call mct_aVect_zero(o2gacc_ox(eoi))
           enddo
+          o2gacc_ox_cnt = 0
 
           if (iamroot_CPLID) then
              write(logunit,*) ' '
@@ -227,7 +237,7 @@ contains
           call seq_map_init_rcfile(mapper_Fo2g, ocn(1), glc(1), &
                'seq_maps.rc','ocn2glc_fmapname:','ocn2glc_fmaptype:',samegrid_og, &
                'mapper_Fo2g initialization',esmf_map_flag)
-               
+
        end if
        call shr_sys_flush(logunit)
 
@@ -324,10 +334,40 @@ contains
 
   end subroutine prep_glc_set_g2x_lx_fields
 
+  !================================================================================================
+
+  subroutine prep_glc_accum_o2g(timer)
+
+     !---------------------------------------------------------------
+    ! Description
+    ! Accumulate o2g inputs
+    !
+    ! Arguments
+    character(len=*), intent(in) :: timer
+    !
+    ! Local Variables
+    integer :: eoi
+    type(mct_avect), pointer :: o2x_ox
+    character(*), parameter :: subname = '(prep_glc_accum_o2g)'
+    !---------------------------------------------------------------
+
+     call t_drvstartf (trim(timer),barrier=mpicom_CPLID)
+    do eoi = 1,num_inst_ocn
+       o2x_ox => component_get_c2x_cx(ocn(eoi))
+       if (o2gacc_ox_cnt == 0) then
+          call mct_avect_copy(o2x_ox, o2gacc_ox(eoi))
+       else
+          call mct_avect_accum(o2x_ox, o2gacc_ox(eoi))
+       endif
+    end do
+    o2gacc_ox_cnt = o2gacc_ox_cnt + 1
+    call t_drvstopf  (trim(timer))
+
+  end subroutine prep_glc_accum_o2g
 
   !================================================================================================
 
-  subroutine prep_glc_accum(timer)
+  subroutine prep_glc_accum_l2g(timer)
 
     !---------------------------------------------------------------
     ! Description
@@ -339,7 +379,7 @@ contains
     ! Local Variables
     integer :: eli
     type(mct_avect), pointer :: l2x_lx
-    character(*), parameter :: subname = '(prep_glc_accum)'
+    character(*), parameter :: subname = '(prep_glc_accum_l2g)'
     !---------------------------------------------------------------
 
     call t_drvstartf (trim(timer),barrier=mpicom_CPLID)
@@ -354,11 +394,38 @@ contains
     l2gacc_lx_cnt = l2gacc_lx_cnt + 1
     call t_drvstopf  (trim(timer))
 
-  end subroutine prep_glc_accum
+  end subroutine prep_glc_accum_l2g
 
   !================================================================================================
 
-  subroutine prep_glc_accum_avg(timer)
+  subroutine prep_glc_accum_o2g_avg(timer)
+
+     !---------------------------------------------------------------
+    ! Description
+    ! Finalize accumulation of glc inputs
+    !
+    ! Arguments
+    character(len=*), intent(in) :: timer
+    !
+    ! Local Variables
+    integer :: eoi
+    character(*), parameter :: subname = '(prep_glc_accum_o2g_avg)'
+    !---------------------------------------------------------------
+
+     call t_drvstartf (trim(timer),barrier=mpicom_CPLID)
+    if (o2gacc_ox_cnt > 1) then
+       do eoi = 1,num_inst_ocn
+          call mct_avect_avg(o2gacc_ox(eoi), o2gacc_ox_cnt)
+       end do
+    end if
+    o2gacc_ox_cnt = 0
+    call t_drvstopf  (trim(timer))
+
+  end subroutine prep_glc_accum_o2g_avg
+
+   !================================================================================================
+
+  subroutine prep_glc_accum_l2g_avg(timer)
 
     !---------------------------------------------------------------
     ! Description
@@ -369,7 +436,7 @@ contains
     !
     ! Local Variables
     integer :: eli
-    character(*), parameter :: subname = '(prep_glc_accum_avg)'
+    character(*), parameter :: subname = '(prep_glc_accum_l2g_avg)'
     !---------------------------------------------------------------
 
     call t_drvstartf (trim(timer),barrier=mpicom_CPLID)
@@ -381,7 +448,7 @@ contains
     l2gacc_lx_cnt = 0
     call t_drvstopf  (trim(timer))
 
-  end subroutine prep_glc_accum_avg
+  end subroutine prep_glc_accum_l2g_avg
 
   !================================================================================================
 
@@ -399,7 +466,7 @@ contains
     ! Local Variables
     integer :: egi, eoi, efi
     type(mct_avect), pointer :: x2g_gx
-    character(*), parameter  :: subname = '(prep_glc_mrg)'
+    character(*), parameter  :: subname = '(prep_glc_mrg_o2g)'
     !---------------------------------------------------------------
 
     call t_drvstartf (trim(timer_mrg),barrier=mpicom_CPLID)
@@ -443,7 +510,7 @@ contains
     logical, save :: first_time = .true.
     character(CL),allocatable :: mrgstr(:)   ! temporary string
     character(CL) :: field   ! string converted to char
-    character(*), parameter   :: subname = '(prep_glc_merge) '
+    character(*), parameter   :: subname = '(prep_glc_merge_o2g) '
 
     !-----------------------------------------------------------------------
 
@@ -451,7 +518,7 @@ contains
     lsize = mct_aVect_lsize(x2g_g)
 
     num_flux_fields = shr_string_listGetNum(trim(seq_flds_x2g_fluxes))
-    num_state_fields = shr_string_listGetNum(trim(seq_flds_x2g_states))
+    num_state_fields = shr_string_listGetNum(trim(seq_flds_x2g_states)
 
     if (first_time) then
        nflds = mct_aVect_nRattr(x2g_g)
@@ -469,7 +536,7 @@ contains
     do i = 1, num_flux_fields
        call seq_flds_getField(field, i, seq_flds_x2g_fluxes)
 
-       if (trim(field) == mr_fieldname) then
+       if (trim(field) == "Fogo_mr") then
           index_o2x = mct_aVect_indexRA(o2x_g, trim(field))
           index_x2g = mct_aVect_indexRA(x2g_g, trim(field))
 
@@ -505,7 +572,7 @@ contains
 
   !================================================================================================
 
-  subroutine prep_glc_mrg(infodata, fractions_gx, timer_mrg)
+  subroutine prep_glc_mrg_l2g(infodata, fractions_gx, timer_mrg)
 
     !---------------------------------------------------------------
     ! Description
@@ -519,7 +586,7 @@ contains
     ! Local Variables
     integer :: egi, eli, efi
     type(mct_avect), pointer :: x2g_gx
-    character(*), parameter  :: subname = '(prep_glc_mrg)'
+    character(*), parameter  :: subname = '(prep_glc_mrg_l2g)'
     !---------------------------------------------------------------
 
     call t_drvstartf (trim(timer_mrg),barrier=mpicom_CPLID)
@@ -529,15 +596,15 @@ contains
        efi = mod((egi-1),num_inst_frc) + 1
 
        x2g_gx => component_get_x2c_cx(glc(egi))
-       call prep_glc_merge(l2x_gx(eli), fractions_gx(efi), x2g_gx)
+       call prep_glc_merge_l2g(l2x_gx(eli), fractions_gx(efi), x2g_gx)
     enddo
     call t_drvstopf  (trim(timer_mrg))
 
-  end subroutine prep_glc_mrg
+  end subroutine prep_glc_mrg_l2g
 
   !================================================================================================
 
-  subroutine prep_glc_merge( l2x_g, fractions_g, x2g_g )
+  subroutine prep_glc_merge_l2g( l2x_g, fractions_g, x2g_g )
 
     !-----------------------------------------------------------------------
     ! Description
@@ -568,7 +635,7 @@ contains
     logical, save :: first_time = .true.
     character(CL),allocatable :: mrgstr(:)   ! temporary string
     character(CL) :: field   ! string converted to char
-    character(*), parameter   :: subname = '(prep_glc_merge) '
+    character(*), parameter   :: subname = '(prep_glc_merge_l2g) '
 
     !-----------------------------------------------------------------------
 
@@ -653,7 +720,7 @@ contains
 
     first_time = .false.
 
-  end subroutine prep_glc_merge
+  end subroutine prep_glc_merge_l2g
 
   !================================================================================================
 
@@ -696,7 +763,7 @@ contains
       o2x_ox => component_get_c2x_cx(ocn(eoi))
       call seq_map_map(mapper_Fo2g, o2x_ox, o2x_gx(eoi), fldlist="Fogo_mr")
     enddo
-    
+
     call t_drvstopf  (trim(timer))
 
   end subroutine prep_glc_calc_o2x_gx
