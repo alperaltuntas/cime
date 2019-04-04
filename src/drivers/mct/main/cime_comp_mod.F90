@@ -3576,7 +3576,6 @@ contains
     ! ocn average
     !----------------------------------------------------
     if (iamin_CPLID .and. ocn_prognostic) then
-
        call cime_comp_barriers(mpicom=mpicom_CPLID, timer='CPL:OCNPREP_BARRIER')
        call t_drvstartf ('CPL:OCNPREP',cplrun=.true.,barrier=mpicom_CPLID)
        if (drv_threading) call seq_comm_setnthreads(nthreads_CPLID)

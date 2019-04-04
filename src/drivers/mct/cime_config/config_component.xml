@@ -1061,7 +1061,8 @@
 
   <entry id="GLC_GRID">
     <type>char</type>
-    <default_value>UNSET</default_value>
+    <valid_values>gland20,gland10,gland5,gland5UM,gland4,mpas.gis20km,mpas.ais20km,null,MISOMIP</valid_values>
+    <default_value>gland5UM</default_value>
     <group>build_grid</group>
     <file>env_build.xml</file>
     <desc>glacier (glc) grid - DO NOT EDIT (for experts only)</desc>
@@ -1816,10 +1817,7 @@
 
   <entry id="EPS_OGRID">
     <type>real</type>
-    <!-- <default_value>1.0e-02</default_value> -->
-    <!-- relax EPS_OGRID for MOM6+CICE, since MOM6 is on C grid and reads a supergrid, whereas-->
-    <!-- CICE is on B grid and constructs TLAT/TLON by interpolating ULAT/ULON - aa, 180606-->
-    <default_value>1.0e-01</default_value>
+    <default_value>1.0e-02</default_value>
     <group>run_domain</group>
     <file>env_run.xml</file>
     <desc>Error tolerance for differences in ocean/ice lon/lat in domain checking</desc>
