@@ -767,7 +767,7 @@ contains
 
     do eoi = 1,num_inst_ocn
       o2x_ox => component_get_c2x_cx(ocn(eoi))
-      call seq_map_map(mapper_Fo2g, o2x_ox, o2x_gx(eoi), fldlist="Fogo_mr")
+      call seq_map_map(mapper_Fo2g, o2x_ox, o2x_gx(eoi), fldlist=seq_flds_x2g_fluxes_from_ocn)
     enddo
 
     call t_drvstopf  (trim(timer))
