@@ -52,12 +52,13 @@
     <desc>full pathname of case</desc>
   </entry>
 
-  <entry id="LOGDIR">
-    <type>char</type>
-    <default_value>$CASEROOT/logs</default_value>
-    <group>run_desc</group>
-    <file>env_run.xml</file>
-    <desc>Extra copies of the component log files will be saved here.</desc>
+  <entry id="NONLOCAL">
+    <type>logical</type>
+    <valid_values>TRUE,FALSE</valid_values>
+    <default_value>FALSE</default_value>
+    <group>case_def</group>
+    <file>env_case.xml</file>
+    <desc>user is not on the requested machine</desc>
   </entry>
 
   <entry id="CASETOOLS">
@@ -234,7 +235,7 @@
 
   <entry id="RUN_REFDIR">
     <type>char</type>
-    <default_value>ccsm4_init</default_value>
+    <default_value>cesm2_init</default_value>
     <group>run_begin_stop_restart</group>
     <file>env_run.xml</file>
     <desc>
@@ -634,15 +635,6 @@
     Must be explicitly set in env_build.xml for userdefined machine.</desc>
   </entry>
 
-  <entry id="SUPPORTED_BY">
-    <type>char</type>
-    <valid_values></valid_values>
-    <default_value></default_value>
-    <group>build_def</group>
-    <file>env_build.xml</file>
-    <desc>email address of person (or group) that supports the build and port for this machine (do not edit)></desc>
-  </entry>
-
   <entry id="MPILIB">
     <type>char</type>
     <valid_values></valid_values>
@@ -666,7 +658,7 @@
 
   <entry id="COMP_INTERFACE">
     <type>char</type>
-    <valid_values>mct,nuopc</valid_values>
+    <valid_values>mct,nuopc,moab</valid_values>
     <default_value>mct</default_value>
     <group>build_def</group>
     <file>env_build.xml</file>
@@ -696,7 +688,7 @@
       runs (i.e., non-DEBUG), due to performance penalties associated with turning on these flags.</desc>
   </entry>
 
-  <entry id="BUILD_THREADED">
+  <entry id="FORCE_BUILD_SMP">
     <type>logical</type>
     <valid_values>TRUE,FALSE</valid_values>
     <default_value>FALSE</default_value>
@@ -738,9 +730,9 @@
     <desc>TRUE implies linking to the Albany library - set
     automatically by XXX_USE_ALBANY options (do not edit). Flag to
     turn on linking to the Albany library. Currently this is used by
-    MPASLI. Note that Albany is a C++ library, so setting this
+    MALI. Note that Albany is a C++ library, so setting this
     variable to TRUE will involve the inclusion of C++ code in the
-    MPASLI executable. This is currently only supported for certain
+    MALI executable. This is currently only supported for certain
     machines.</desc>
   </entry>
 
@@ -900,7 +892,7 @@
 
   <entry id="ESMF_LOGFILE_KIND">
     <type>char</type>
-    <valid_values>ESMF_LOGKIND_SINGLE,ESMF_LOGKIND_MULTI,ESMF_LOGKIND_NONE</valid_values>
+    <valid_values>ESMF_LOGKIND_SINGLE,ESMF_LOGKIND_MULTI,ESMF_LOGKIND_MULTI_ON_ERROR,ESMF_LOGKIND_NONE</valid_values>
     <default_value>ESMF_LOGKIND_NONE</default_value>
     <group>run_flags</group>
     <file>env_run.xml</file>
@@ -1509,10 +1501,11 @@
 
   <entry id="ROF2OCN_FMAPNAME">
     <type>char</type>
-    <default_value>idmap</default_value>
+    <default_value>idmap_ignore</default_value>
     <group>run_domain</group>
     <file>env_run.xml</file>
-    <desc>rof2ocn flux mapping file</desc>
+    <desc>rof2ocn flux mapping file - the default value idmap_ignore, if set, will be ignored by buildnml and
+    will generate a runtime error if in fact a file is required for the given compset</desc>
   </entry>
 
   <entry id="ROF2OCN_FMAPTYPE">
@@ -1594,10 +1587,11 @@
 
   <entry id="GLC2ICE_RMAPNAME">
     <type>char</type>
-    <default_value>idmap</default_value>
+    <default_value>idmap_ignore</default_value>
     <group>run_domain</group>
     <file>env_run.xml</file>
-    <desc>glc2ice runoff mapping file</desc>
+    <desc>glc2ice runoff mapping file - the default value idmap_ignore, if set, will be ignored by buildnml and
+    will generate a runtime error if in fact a file is required for the given compset</desc>
   </entry>
 
   <entry id="GLC2ICE_RMAPTYPE">
@@ -1611,10 +1605,11 @@
 
   <entry id="GLC2OCN_LIQ_RMAPNAME">
     <type>char</type>
-    <default_value>idmap</default_value>
+    <default_value>idmap_ignore</default_value>
     <group>run_domain</group>
     <file>env_run.xml</file>
-    <desc>glc2ocn runoff mapping file for liquid runoff</desc>
+    <desc>glc2ocn runoff mapping file for liquid runoff - the default value idmap_ignore, if set, will be ignored by buildnml and
+    will generate a runtime error if in fact a file is required for the given compset</desc>
   </entry>
 
   <entry id="GLC2OCN_LIQ_RMAPTYPE">
@@ -1628,10 +1623,11 @@
 
   <entry id="GLC2OCN_ICE_RMAPNAME">
     <type>char</type>
-    <default_value>idmap</default_value>
+    <default_value>idmap_ignore</default_value>
     <group>run_domain</group>
     <file>env_run.xml</file>
-    <desc>glc2ocn runoff mapping file for ice runoff</desc>
+    <desc>glc2ocn runoff mapping file for ice runoff - the default value idmap_ignore, if set, will be ignored by buildnml and
+    will generate a runtime error if in fact a file is required for the given compset</desc>
   </entry>
 
   <entry id="GLC2OCN_ICE_RMAPTYPE">
@@ -1806,8 +1802,29 @@
     <group>run_din</group>
     <file>env_run.xml</file>
     <desc>
-      A regular expression to search for an indication that a run failure was caused by a node failure
-      and should therefore be re-attempted.
+      A regular expression to search for an indication that a run failure
+       was caused by a node failure and should therefore be re-attempted.
+    </desc>
+  </entry>
+
+  <entry id="MPIRUN_RETRY_REGEX">
+    <type>char</type>
+    <group>run_din</group>
+    <file>env_run.xml</file>
+    <desc>
+      A regular expression to search for an indication that a run failure
+      was caused by a known event such as a timeout and should therefore
+      be re-attempted.
+    </desc>
+  </entry>
+
+  <entry id="MPIRUN_RETRY_COUNT">
+    <type>integer</type>
+    <default_value>0</default_value>
+    <group>run_din</group>
+    <file>env_run.xml</file>
+    <desc>The number of times to reattempt the mpirun command if
+    MPIRUN_RETRY_REGEX is matched but ALLOCATE_SPARE_NODES is False
     </desc>
   </entry>
 
@@ -2039,7 +2056,7 @@
     <default_value>0</default_value>
     <group>mach_pes_last</group>
     <file>env_mach_pes.xml</file>
-    <desc>total number of MPI tasks (setup automatically - DO NOT EDIT)</desc>
+    <desc>total number of physical cores used (setup automatically - DO NOT EDIT)</desc>
   </entry>
 
   <entry id="MAX_TASKS_PER_NODE">
@@ -2673,6 +2690,16 @@
    <file>env_batch.xml</file>
    <desc>whether the PROJECT value is required on this machine</desc>
  </entry>
+
+ <entry id="COMPARE_TO_NUOPC">
+   <type>logical</type>
+   <valid_values>TRUE,FALSE</valid_values>
+   <default_value>FALSE</default_value>
+   <group>comparison_to_nuopc</group>
+   <file>env_build.xml</file>
+   <desc>TRUE=>turn on CPP variable COMPARE_TO_NUOPC</desc>
+ </entry>
+
 
  <help>
     =========================================

@@ -292,7 +292,6 @@
     </values>
   </entry>
 
-<!--      CURRENTLY DOES NOT EXIST
   <entry id="model_version" modify_via_xml="CCSM_REPOTAG">
     <type>char</type>
     <category>expdef</category>
@@ -301,10 +300,21 @@
       model version documentation,
     </desc>
     <values>
-      <value>unset</value>
+      <value>$MODEL_VERSION</value>
     </values>
   </entry>
--->
+
+  <entry id="model_doi_url" modify_via_xml="MODEL_DOI_URL">
+    <type>char</type>
+    <category>expdef</category>
+    <group>seq_infodata_inparm</group>
+    <desc>
+      model doi url
+    </desc>
+    <values>
+      <value>$MODEL_DOI_URL</value>
+    </values>
+  </entry>
 
   <entry id="username" modify_via_xml="USER">
     <type>char</type>
@@ -430,6 +440,7 @@
     </desc>
     <values>
       <value>fixed_year</value>
+      <value iyear='HIST' cime_model='cesm'>variable_year</value>
     </values>
   </entry>
 
@@ -443,6 +454,8 @@
     <values>
       <value>1990</value>
       <value iyear="1850" cime_model="cesm">1850</value>
+      <value iyear="2000" cime_model="cesm">2000</value>
+      <value iyear='HIST' cime_model='cesm'>1850</value>
     </values>
   </entry>
 
@@ -456,6 +469,8 @@
     <values>
       <value>1990</value>
       <value iyear="1850" cime_model="cesm">1850</value>
+      <value iyear="2000" cime_model="cesm">2000</value>
+      <value iyear='HIST' cime_model='cesm'>1850</value>
     </values>
   </entry>
 
@@ -665,6 +680,8 @@
     <values>
       <value cime_model='e3sm'>.false.</value>
       <value cime_model='cesm'>.true.</value>
+      <value cime_model='cesm' atm_grid="T62">.false.</value>
+      <value cime_model='cesm' atm_grid="TL319">.false.</value>
     </values>
   </entry>
 
@@ -690,7 +707,10 @@
       Setting this to zero will always do flux_max_iteration
     </desc>
     <values>
-      <value cime_model='cesm'>0.0</value>
+      <!-- the value for f09 grids is maintained as 0.0 for compatibility with cmip6 experiments
+           the 1% convergence criteria improves performance of the atm ocn flux calculation in shr_flux_mod.F90 -->
+      <value cime_model='cesm'>0.01</value>
+      <value cime_model='cesm' atm_grid="0.9x1.25">0.0</value>
       <value cime_model='e3sm'>0.0</value>
     </values>
   </entry>
@@ -705,18 +725,6 @@
     <values>
       <value cime_model='cesm'>5</value>
       <value cime_model='e3sm'>2</value>
-    </values>
-  </entry>
-
-  <entry id="gust_fac">
-    <type>real</type>
-    <category>control</category>
-    <group>seq_infodata_inparm</group>
-    <desc>
-      wind gustiness factor
-    </desc>
-    <values>
-      <value>0.0D0</value>
     </values>
   </entry>
 
@@ -901,7 +909,7 @@
     <type>char</type>
     <category>expdef</category>
     <group>seq_infodata_inparm</group>
-    <valid_values>CESM1_ORIG,CESM1_MOD,CESM1_ORIG_TIGHT,CESM1_MOD_TIGHT,RASM_OPTION1,RASM_OPTION2</valid_values>
+    <valid_values>CESM1_MOD,CESM1_MOD_TIGHT,RASM_OPTION1,RASM_OPTION2,NUOPC,NUOPC_TIGHT</valid_values>
     <desc>
       Set the coupler sequencing.
     </desc>
@@ -1146,7 +1154,13 @@
     <category>history</category>
     <group>seq_infodata_inparm</group>
     <desc>
-      turns on coupler history stream for instantaneous runoff to coupler fields.
+      turns on coupler history stream for average* runoff to coupler fields
+      (*despite the lack of an averaging time span in the name).
+      Files are written at time-of-day = 00000, and at the end of the run interval,
+      even if that time is not 00000.
+      Run length less than 24 hours; averaging period is the run length,
+      Otherwise; averaging period is 24 hours for files before the last (partial) day,
+                 averaging period is the last (partial) day for the last file.
       default: false
     </desc>
     <values>
@@ -1154,12 +1168,26 @@
     </values>
   </entry>
 
-  <entry id="histaux_l2x1yr">
+  <entry id="histaux_l2x1yrg">
     <type>logical</type>
     <category>history</category>
     <group>seq_infodata_inparm</group>
     <desc>
-      turns on coupler history stream for annual sno to coupler fields.
+      turns on coupler history stream for annual lnd to coupler glc forcing fields.
+      default: false
+    </desc>
+    <values>
+      <value>.false.</value>
+    </values>
+  </entry>
+
+  <entry id="histaux_double_precision">
+    <type>logical</type>
+    <category>history</category>
+    <group>seq_infodata_inparm</group>
+    <desc>
+      if true, use double-precision rather than single-precision for
+      coupler auxiliary history files
       default: false
     </desc>
     <values>
@@ -1434,6 +1462,19 @@
     <group>seq_infodata_inparm</group>
     <desc>
       Use faster method for reprosum, but one where reproducibility is not always guaranteed.
+      default: .false.
+    </desc>
+    <values>
+      <value>.false.</value>
+    </values>
+  </entry>
+
+  <entry id="reprosum_allow_infnan">
+    <type>logical</type>
+    <category>reprosum</category>
+    <group>seq_infodata_inparm</group>
+    <desc>
+      Allow INF and NaN in summands
       default: .false.
     </desc>
     <values>
@@ -1778,7 +1819,7 @@
     </values>
   </entry>
 
-  <entry id="stop_ymd" modify_via_xml="STOP_YMD">
+  <entry id="stop_ymd" modify_via_xml="STOP_DATE">
     <type>integer</type>
     <category>time</category>
     <group>seq_timemgr_inparm</group>
@@ -2236,6 +2277,23 @@
     </desc>
     <values>
       <value>0.0</value>
+    </values>
+  </entry>
+
+  <!-- =========================== -->
+  <!-- group esmf_inparm           -->
+  <!-- =========================== -->
+
+  <entry id="esmf_logfile_kind" modify_via_xml="ESMF_LOGFILE_KIND">
+    <type>char</type>
+    <category>driver</category>
+    <group>esmf_inparm</group>
+    <valid_values>ESMF_LOGKIND_SINGLE,ESMF_LOGKIND_MULTI,ESMF_LOGKIND_MULTI_ON_ERROR,ESMF_LOGKIND_NONE</valid_values>
+    <desc>
+      Specify type of ESMF logging
+    </desc>
+    <values>
+      <value>$ESMF_LOGFILE_KIND</value>
     </values>
   </entry>
 
@@ -2812,6 +2870,32 @@
     </desc>
     <values>
       <value>$PSTRID_CPL</value>
+    </values>
+  </entry>
+
+  <entry id="info_taskmap_model">
+    <type>integer</type>
+    <category>cime_pes</category>
+    <group>cime_pes</group>
+    <desc>
+      level of task-to-node mapping output for the whole model 
+      (0: no output; 1: compact; 2: verbose)
+    </desc>
+    <values>
+      <value>$INFO_TASKMAP_MODEL</value>
+    </values>
+  </entry>
+
+  <entry id="info_taskmap_comp">
+    <type>integer</type>
+    <category>cime_pes</category>
+    <group>cime_pes</group>
+    <desc>
+      level of task-to-node mapping output for individual component models
+      (0: no output; 1: compact; 2: verbose)
+    </desc>
+    <values>
+      <value>$INFO_TASKMAP_COMP</value>
     </values>
   </entry>
 

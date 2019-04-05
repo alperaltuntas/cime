@@ -2,6 +2,7 @@
 CIME ERI test  This class inherits from SystemTestsCommon
 """
 from CIME.XML.standard_module_setup import *
+from CIME.utils import safe_copy
 from CIME.SystemTests.system_tests_common import SystemTestsCommon
 import shutil, glob, os
 
@@ -17,7 +18,7 @@ def _helper(dout_sr, refdate, refsec, rundir):
         os.symlink(item, dst)
 
     for item in glob.glob("{}/*rpointer*".format(rest_path)):
-        shutil.copy(item, rundir)
+        safe_copy(item, rundir)
 
 class ERI(SystemTestsCommon):
 
@@ -84,13 +85,13 @@ class ERI(SystemTestsCommon):
         logger.info("  writing restarts at {} {}".format(rest_n1, stop_option))
         logger.info("  short term archiving is on ")
 
-        clone1.set_value("CONTINUE_RUN", False)
-        clone1.set_value("RUN_STARTDATE", start_1)
-        clone1.set_value("STOP_N", stop_n1)
-        clone1.set_value("REST_OPTION", stop_option)
-        clone1.set_value("REST_N", rest_n1)
-        clone1.set_value("HIST_OPTION", "never")
-        clone1.flush()
+        with clone1:
+            clone1.set_value("CONTINUE_RUN", False)
+            clone1.set_value("RUN_STARTDATE", start_1)
+            clone1.set_value("STOP_N", stop_n1)
+            clone1.set_value("REST_OPTION", stop_option)
+            clone1.set_value("REST_N", rest_n1)
+            clone1.set_value("HIST_OPTION", "never")
 
         dout_sr1 = clone1.get_value("DOUT_S_ROOT")
 
@@ -99,12 +100,14 @@ class ERI(SystemTestsCommon):
             if "inithist" not in open("user_nl_cam", "r").read():
                 with open("user_nl_cam", "a") as fd:
                     fd.write("inithist = 'ENDOFRUN'\n")
-        clone1.case_setup(test_mode=True, reset=True)
-        # if the initial case is hybrid this will put the reference data in the correct location
-        clone1.check_all_input_data()
 
-        self._skip_pnl = False
-        self.run_indv(st_archive=True, suffix=None)
+        with clone1:
+            clone1.case_setup(test_mode=True, reset=True)
+            # if the initial case is hybrid this will put the reference data in the correct location
+            clone1.check_all_input_data()
+
+            self._skip_pnl = False
+            self.run_indv(st_archive=True, suffix=None)
 
         #
         # (2) Test run:
@@ -126,19 +129,19 @@ class ERI(SystemTestsCommon):
         logger.info("  short term archiving is on ")
 
         # setup ref2 case
-        clone2.set_value("RUN_TYPE",      "hybrid")
-        clone2.set_value("RUN_STARTDATE", start_2)
-        clone2.set_value("RUN_REFCASE",   "{}.ref1".format(orig_casevar))
-        clone2.set_value("RUN_REFDATE",   refdate_2)
-        clone2.set_value("RUN_REFTOD",    refsec_2)
-        clone2.set_value("GET_REFCASE",   False)
-        clone2.set_value("CONTINUE_RUN",  False)
-        clone2.set_value("STOP_N",        stop_n2)
-        clone2.set_value("REST_OPTION",   stop_option)
-        clone2.set_value("REST_N",        rest_n2)
-        clone2.set_value("HIST_OPTION",   stop_option)
-        clone2.set_value("HIST_N",        hist_n)
-        clone2.flush()
+        with clone2:
+            clone2.set_value("RUN_TYPE",      "hybrid")
+            clone2.set_value("RUN_STARTDATE", start_2)
+            clone2.set_value("RUN_REFCASE",   "{}.ref1".format(orig_casevar))
+            clone2.set_value("RUN_REFDATE",   refdate_2)
+            clone2.set_value("RUN_REFTOD",    refsec_2)
+            clone2.set_value("GET_REFCASE",   False)
+            clone2.set_value("CONTINUE_RUN",  False)
+            clone2.set_value("STOP_N",        stop_n2)
+            clone2.set_value("REST_OPTION",   stop_option)
+            clone2.set_value("REST_N",        rest_n2)
+            clone2.set_value("HIST_OPTION",   stop_option)
+            clone2.set_value("HIST_N",        hist_n)
 
         rundir2 = clone2.get_value("RUNDIR")
         dout_sr2 = clone2.get_value("DOUT_S_ROOT")
@@ -146,10 +149,11 @@ class ERI(SystemTestsCommon):
         _helper(dout_sr1, refdate_2, refsec_2, rundir2)
 
         # run ref2 case (all component history files will go to short term archiving)
-        clone2.case_setup(test_mode=True, reset=True)
+        with clone2:
+            clone2.case_setup(test_mode=True, reset=True)
 
-        self._skip_pnl = False
-        self.run_indv(suffix="hybrid", st_archive=True)
+            self._skip_pnl = False
+            self.run_indv(suffix="hybrid", st_archive=True)
 
         #
         # (3a) Test run:
