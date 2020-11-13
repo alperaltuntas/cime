@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  <!-- attributes -->
+  <xs:attribute name="version" type="xs:decimal"/>
+  <xs:attribute name="id" type="xs:NCName"/>
+  <xs:attribute name="match" type="xs:string"/>
+
+  <!-- simple elements -->
+  <xs:element name="component" type="xs:string"/>
+  <xs:element name="mode" type="xs:string"/>
+
+  <!-- complex elements -->
+
+  <xs:element name="depends">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="dependency"/>
+      </xs:sequence>
+      <xs:attribute ref="version" use="required"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="dependency">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="component"/>
+        <xs:element ref="mode"/>
+      </xs:sequence>
+      <xs:attribute ref="id" use="required"/>
+    </xs:complexType>
+  </xs:element>
+
+</xs:schema>
