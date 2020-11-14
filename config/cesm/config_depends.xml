@@ -5,6 +5,23 @@
 <dependency id="OCN_DEPENDS">
   <component>MOM6</component>
   <mode>ACTIVE</mode>
+  <relation id="coupling" arity="2" type="component.component">
+    <default>
+      <atm>CAM60</atm>
+      <lnd>CLM50</lnd>
+      <ice>CAM60</ice>
+    </default>
+    <enabled>
+      <atm>DATM,CAM[456]0</atm>
+      <lnd>CLM45,CLM50</lnd>
+      <ice>DICE,CICE</ice>
+    </enabled>
+    <disabled>
+      <atm>CAM[456]0%SCAM</atm>
+      <lnd>null</lnd>
+      <ice>null</ice>
+    </disabled>
+  </relation>
 </dependency>
 
 </depends>

@@ -25,8 +25,22 @@
       <xs:sequence>
         <xs:element ref="component"/>
         <xs:element ref="mode"/>
+        <xs:element maxOccurs="unbounded" ref="relation"/>
       </xs:sequence>
       <xs:attribute ref="id" use="required"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="relation">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="default"/> <!-- TODO: further specify-->
+        <xs:element name="enabled"/> <!-- TODO: further specify-->
+        <xs:element name="disabled"/> <!-- TODO: further specify-->
+      </xs:sequence>
+      <xs:attribute name="id"/> <!-- TODO: further specify-->
+      <xs:attribute name="arity"/> <!-- TODO: further specify-->
+      <xs:attribute name="type"/> <!-- TODO: further specify-->
     </xs:complexType>
   </xs:element>
 
