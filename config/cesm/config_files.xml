@@ -328,26 +328,26 @@
     <schema>$CIMEROOT/config/xml_schemas/config_archive.xsd</schema>
   </entry>
 
-  <entry id="DEPENDS_SPEC_FILE">
+  <entry id="COMPLY_SPEC_FILE">
     <type>char</type>
     <default_value>unset</default_value>
     <values>
-      <value>$CIMEROOT/config/cesm/config_depends.xml</value>
+      <value>$CIMEROOT/config/cesm/config_comply.xml</value>
       <!--
-      <value component="drv"       >$COMP_ROOT_DIR_CPL/cime_config/config_depends.xml</value>
-      <value component="cam"       >$COMP_ROOT_DIR_ATM/cime_config/config_depends.xml</value>
-      <value component="ufsatm"    >$COMP_ROOT_DIR_ATM/cime_config/config_depends.xml</value>
-      <value component="cism"      >$COMP_ROOT_DIR_GLC/cime_config/config_depends.xml</value>
-      <value component="clm"       >$COMP_ROOT_DIR_LND/cime_config/config_depends.xml</value>
-      <value component="cice"      >$COMP_ROOT_DIR_ICE/cime_config/config_depends.xml</value>
-      <value component="pop"       >$COMP_ROOT_DIR_OCN/cime_config/config_depends.xml</value>
+      <value component="drv"       >$COMP_ROOT_DIR_CPL/cime_config/config_comply.xml</value>
+      <value component="cam"       >$COMP_ROOT_DIR_ATM/cime_config/config_comply.xml</value>
+      <value component="ufsatm"    >$COMP_ROOT_DIR_ATM/cime_config/config_comply.xml</value>
+      <value component="cism"      >$COMP_ROOT_DIR_GLC/cime_config/config_comply.xml</value>
+      <value component="clm"       >$COMP_ROOT_DIR_LND/cime_config/config_comply.xml</value>
+      <value component="cice"      >$COMP_ROOT_DIR_ICE/cime_config/config_comply.xml</value>
+      <value component="pop"       >$COMP_ROOT_DIR_OCN/cime_config/config_comply.xml</value>
       -->
-      <value component="mom"       >$COMP_ROOT_DIR_OCN/cime_config/config_depends.xml</value>
+      <value component="mom"       >$COMP_ROOT_DIR_OCN/cime_config/config_comply.xml</value>
     </values>
-    <group>case_last</group> <!-- TODO: define a new group for depends.-->
-    <file>env_depends.xml</file>
+    <group>case_last</group> <!-- TODO: define a new group for comply.-->
+    <file>env_comply.xml</file>
     <desc>file containing specification of inter-component dependencies</desc>
-    <schema>$CIMEROOT/config/xml_schemas/config_depends.xsd</schema>
+    <schema>$CIMEROOT/config/xml_schemas/config_comply.xsd</schema>
   </entry>
 
   <entry id="SYSTEM_TESTS_DIR">
