@@ -4,43 +4,41 @@
   <xs:attribute name="version" type="xs:decimal"/>
   <xs:attribute name="id" type="xs:NCName"/>
   <xs:attribute name="match" type="xs:string"/>
+  <xs:attribute name="arity" type="xs:string"/>
+  <xs:attribute name="mapping" type="xs:string"/>
 
   <!-- simple elements -->
   <xs:element name="component" type="xs:string"/>
-  <xs:element name="mode" type="xs:string"/>
 
   <!-- complex elements -->
 
   <xs:element name="comply">
     <xs:complexType>
       <xs:sequence>
-        <xs:element maxOccurs="unbounded" ref="compliance"/>
-      </xs:sequence>
-      <xs:attribute ref="version" use="required"/>
-    </xs:complexType>
-  </xs:element>
-
-  <xs:element name="compliance">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:element ref="component"/>
-        <xs:element ref="mode"/>
         <xs:element maxOccurs="unbounded" ref="relation"/>
       </xs:sequence>
-      <xs:attribute ref="id" use="required"/>
+      <xs:attribute ref="version" use="required"/>
     </xs:complexType>
   </xs:element>
 
   <xs:element name="relation">
     <xs:complexType>
       <xs:sequence>
-        <xs:element name="default"/> <!-- TODO: further specify-->
-        <xs:element name="enabled"/> <!-- TODO: further specify-->
-        <xs:element name="disabled"/> <!-- TODO: further specify-->
+        <xs:element maxOccurs="unbounded" ref="entry"/>
       </xs:sequence>
       <xs:attribute name="id"/> <!-- TODO: further specify-->
-      <xs:attribute name="arity"/> <!-- TODO: further specify-->
-      <xs:attribute name="type"/> <!-- TODO: further specify-->
+      <xs:attribute ref="arity"/> <!-- TODO: further specify-->
+      <xs:attribute ref="mapping"/> <!-- TODO: further specify-->
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="entry">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" maxOccurs="unbounded" name="assert"/> <!-- TODO: further specify-->
+        <xs:element minOccurs="0" maxOccurs="unbounded" name="reject"/> <!-- TODO: further specify-->
+      </xs:sequence>
+      <xs:attribute name="id"/>
     </xs:complexType>
   </xs:element>
 

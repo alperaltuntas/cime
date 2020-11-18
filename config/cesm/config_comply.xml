@@ -2,26 +2,14 @@
 
 <comply version="1.1">
 
-<compliance id="OCN_COMPLIANCE">
-  <component>MOM6</component>
-  <mode>ACTIVE</mode>
-  <relation id="coupling" arity="2" type="component.component">
-    <default>
-      <atm>CAM60</atm>
-      <lnd>CLM50</lnd>
-      <ice>CAM60</ice>
-    </default>
-    <enabled>
-      <atm>DATM,CAM[456]0</atm>
-      <lnd>CLM45,CLM50</lnd>
-      <ice>DICE,CICE</ice>
-    </enabled>
-    <disabled>
-      <atm>CAM[456]0%SCAM</atm>
-      <lnd>null</lnd>
-      <ice>null</ice>
-    </disabled>
-  </relation>
-</compliance>
+<relation id="OCN_COUPLING" arity="2" mapping="COMP_OCN.COMPSET">
+  <entry id="MOM6">
+    <assert errMsg="LND or ICE must be present to hide MOM6 grid poles.">(DLND|CLM)|(DICE|CICE)</assert>
+    <reject errMsg="MOM6 cannot be coupled to single column CAM (SCAM).">CAM[456]%SCAM</reject>
+  </entry>
+  <entry id="MOM6%BGC">
+    <assert errMsg="In BGC mode, MOM6 requires CLM%BGC or no CLM at all">(CLM%BGC)|(SLND|DLND)</assert>
+  </entry>
+</relation>
 
 </comply>
