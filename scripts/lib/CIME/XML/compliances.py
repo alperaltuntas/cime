@@ -27,3 +27,42 @@ class Compliances(GenericXML):
 
         print("Constructed Comply.")
 
+    def check(self, case):
+
+        print("-------------Checking compliances------------")
+        print(self.get_id())
+        relations = self.get_children()
+
+        for relation in relations:
+            # relate_vars: xml case vars to be checked for relational integrity
+            relate_vars = self.get(relation,"relate").split('.')
+            arity = int(self.get(relation,"arity"))
+            assert arity == len(relate_vars)
+
+            relate_vals = [] # the XML case
+            for relate_var in relate_vars:
+                relate_val = case.get_value(relate_var)
+                expect(relate_val!=None, "Cannot find XML case var "
+                    +relate_var+" specified in config_compliances as the "
+                    "relate attribute of "+self.get(relation,"id")+" relation.")
+                relate_vals.append(relate_val)
+
+            entries = self.get_children("entry",root=relation)
+            for entry in entries:
+                entry_id = self.get(entry,"id")
+                assertions = self.get_children("assert",root=entry)
+                rejections = self.get_children("reject",root=entry)
+                print(entry_id, relate_vals[0])
+                if re.search(entry_id, relate_vals[0]):
+                    if arity==2:
+                        for assertion in assertions:
+                            val = self.text(assertion)
+                            errMsg = self.get(assertion,"errMsg")
+                            expect(re.search(val, relate_val),errMsg)
+                        for rejection in rejections:
+                            val = self.text(rejection)
+                            errMsg = self.get(rejection,"errMsg")
+                            expect(not re.search(val, relate_val),errMsg)
+                    else:
+                        raise NotImplementedError
+
