@@ -5,7 +5,7 @@
   <xs:attribute name="id" type="xs:NCName"/>
   <xs:attribute name="match" type="xs:string"/>
   <xs:attribute name="arity" type="xs:string"/>
-  <xs:attribute name="mapping" type="xs:string"/>
+  <xs:attribute name="relate" type="xs:string"/>
 
   <!-- simple elements -->
   <xs:element name="component" type="xs:string"/>
@@ -28,7 +28,7 @@
       </xs:sequence>
       <xs:attribute name="id"/> <!-- TODO: further specify-->
       <xs:attribute ref="arity"/> <!-- TODO: further specify-->
-      <xs:attribute ref="mapping"/> <!-- TODO: further specify-->
+      <xs:attribute ref="relate"/> <!-- TODO: further specify-->
     </xs:complexType>
   </xs:element>
 

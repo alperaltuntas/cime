@@ -2,14 +2,23 @@
 
 <comply version="1.1">
 
-<relation id="OCN_COUPLING" arity="2" mapping="COMP_OCN.COMPSET">
+<relation id="OCN_COUPLING" arity="2" relate="COMPSET.COMPSET">
   <entry id="MOM6">
-    <assert errMsg="LND or ICE must be present to hide MOM6 grid poles.">(DLND|CLM)|(DICE|CICE)</assert>
+    <assert errMsg="LND or ICE must be present to hide MOM6 grid poles.">DLND|CLM|DICE|CICE</assert>
     <reject errMsg="MOM6 cannot be coupled to single column CAM (SCAM).">CAM[456]%SCAM</reject>
   </entry>
   <entry id="MOM6%BGC">
-    <assert errMsg="In BGC mode, MOM6 requires CLM%BGC or no CLM at all">(CLM%BGC)|(SLND|DLND)</assert>
+    <assert errMsg="In BGC mode, MOM6 requires CLM%BGC or no CLM at all">CLM%BGC|SLND|DLND</assert>
   </entry>
 </relation>
+
+<!-- TODO: potential application of arity greater then two: relate="COMPSET.COMPSET.OCN_DOMAIN
+ Check if LND or ICE is present only if OCN_DOMAIN is not REGIONAL, i.e., spherical
+-->
+
+<!-- TODO: add a mechanism to prevent defining relations/assertions already expressible in
+existing xml files via existing metada. An example: There shouldn't be a GRID.COMPONENT
+relation. That relation is perfectly expressible in config_grids.xml
+-->
 
 </comply>
