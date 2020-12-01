@@ -4,8 +4,7 @@
   <xs:attribute name="version" type="xs:decimal"/>
   <xs:attribute name="id" type="xs:NCName"/>
   <xs:attribute name="match" type="xs:string"/>
-  <xs:attribute name="arity" type="xs:string"/>
-  <xs:attribute name="relate" type="xs:string"/>
+  <xs:attribute name="vars" type="xs:string"/>
 
   <!-- simple elements -->
   <xs:element name="component" type="xs:string"/>
@@ -24,21 +23,25 @@
   <xs:element name="relation">
     <xs:complexType>
       <xs:sequence>
-        <xs:element maxOccurs="unbounded" ref="entry"/>
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="assert"/>
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="reject"/>
       </xs:sequence>
       <xs:attribute name="id"/> <!-- TODO: further specify-->
-      <xs:attribute ref="arity"/> <!-- TODO: further specify-->
-      <xs:attribute ref="relate"/> <!-- TODO: further specify-->
+      <xs:attribute ref="vars"/> <!-- TODO: further specify-->
     </xs:complexType>
   </xs:element>
 
-  <xs:element name="entry">
+  <xs:element name="assert">
     <xs:complexType>
-      <xs:sequence>
-        <xs:element minOccurs="0" maxOccurs="unbounded" name="assert"/> <!-- TODO: further specify-->
-        <xs:element minOccurs="0" maxOccurs="unbounded" name="reject"/> <!-- TODO: further specify-->
-      </xs:sequence>
-      <xs:attribute name="id"/>
+      <xs:attribute name="inst"/> <!-- TODO: further specify-->
+      <xs:attribute name="errMsg"/> <!-- TODO: further specify-->
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="reject">
+    <xs:complexType>
+      <xs:attribute name="inst"/> <!-- TODO: further specify-->
+      <xs:attribute name="errMsg"/> <!-- TODO: further specify-->
     </xs:complexType>
   </xs:element>
 

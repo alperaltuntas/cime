@@ -2,14 +2,41 @@
 
 <comply version="1.1">
 
-<relation id="OCN_COUPLING" arity="2" relate="COMPSET.COMPSET">
-  <entry id="MOM6">
-    <assert errMsg="LND or ICE must be present to hide MOM6 grid poles.">DLND|CLM|DICE|CICE</assert>
-    <reject errMsg="MOM6 cannot be coupled to single column CAM (SCAM).">CAM[456]%SCAM</reject>
-  </entry>
-  <entry id="MOM6%BGC">
-    <assert errMsg="In BGC mode, MOM6 requires CLM%BGC or no CLM at all">CLM%BGC|SLND|DLND</assert>
-  </entry>
+<!-- Entries in this file, config_comply.xml, define hierarchical relations
+      among XML variables, e.g, COMPSET, GRID, etc., and any logical rules
+      that are to apply to those relations. -->
+
+<!-- Relations that specify hierarchy only-->
+<relation vars="COMP_ATM->COMPSET" id="ATM_COMPSET"/>
+<relation vars="COMP_LND->COMPSET" id="LND_COMPSET"/>
+<relation vars="COMP_ICE->COMPSET" id="ICE_COMPSET"/>
+<relation vars="COMP_OCN->COMPSET" id="OCN_COMPSET"/>
+<relation vars="COMP_ROF->COMPSET" id="ROF_COMPSET"/>
+<relation vars="COMP_GLC->COMPSET" id="GLC_COMPSET"/>
+<relation vars="COMP_WAV->COMPSET" id="WAV_COMPSET"/>
+<relation vars="COMP_CPL->COMPSET" id="CPL_COMPSET"/>
+
+<relation vars="COMPSET->ATM_GRID->GRID" id="ATM_COMP_GRID"/>
+<relation vars="COMPSET->LND_GRID->GRID" id="LND_COMP_GRID"/>
+<relation vars="COMPSET->ICE_GRID->GRID" id="ICE_COMP_GRID"/>
+<relation vars="COMPSET->OCN_GRID->GRID" id="OCN_COMP_GRID"/>
+<relation vars="COMPSET->ROF_GRID->GRID" id="ROF_COMP_GRID"/>
+<relation vars="COMPSET->GLC_GRID->GRID" id="GLC_COMP_GRID"/>
+<relation vars="COMPSET->WAV_GRID->GRID" id="WAV_COMP_GRID"/>
+
+<!-- Relations that specify (in)compatibilities -->
+<relation vars="COMP_OCN->COMP_WAV" id="MOM6_WAV_COUPLING">
+  <reject inst="mom->ww" errMsg="MOM6 cannot be coupled with WW3."/>
+</relation>
+
+<relation vars="COMP_OCN->COMP_GLC" id="MOM6_GLC_COUPLING">
+  <reject inst="mom->cism" errMsg="MOM6 cannot be coupled with CISM."/>
+</relation>
+
+<relation vars="COMPSET->COMPSET" id="MOM6_COMPSETS">
+  <assert inst="MOM6->DLND|CLM|DICE|CICE"     errMsg="LND or ICE must be present to hide MOM6 grid poles."/>
+  <assert inst="MOM6%BGC->CLM%BGC|SLND|DLND"  errMsg="In BGC mode, MOM6 requires CLM%BGC or no CLM at all"/>
+  <reject inst="MOM6->CAM[456]%SCAM"          errMsg="MOM6 cannot be coupled to single column CAM (SCAM)."/>
 </relation>
 
 <!-- TODO: potential application of arity greater then two: relate="COMPSET.COMPSET.OCN_DOMAIN

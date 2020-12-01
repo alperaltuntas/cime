@@ -54,9 +54,8 @@ class Compliances(GenericXML):
 
         for relation in relations:
             # relate_vars: xml case vars to be checked for relational integrity
-            relate_vars = self.get(relation,"relate").split('->')
-            arity = int(self.get(relation,"arity"))
-            assert arity == len(relate_vars), "Wrong arity in relation "+self.get(relation,"id")
+            relate_vars = self.get(relation,"vars").split('->')
+            assert len(relate_vars)>=2, "The following relation has less than two xml variables (to be split by ->):"+relate_vars
 
             relate_vals = [] # the XML case
             for relate_var in relate_vars:
@@ -66,22 +65,32 @@ class Compliances(GenericXML):
                     "relate attribute of "+self.get(relation,"id")+" relation.")
                 relate_vals.append(relate_val)
 
-            entries = self.get_children("entry",root=relation)
-            for entry in entries:
-                entry_id = self.get(entry,"id")
-                assertions = self.get_children("assert",root=entry)
-                rejections = self.get_children("reject",root=entry)
-                print(entry_id, relate_vals[0])
-                if re.search(entry_id, relate_vals[0]):
-                    if arity==2:
-                        for assertion in assertions:
-                            val = self.text(assertion)
-                            errMsg = self.get(assertion,"errMsg")
-                            expect(re.search(val, relate_val),errMsg)
-                        for rejection in rejections:
-                            val = self.text(rejection)
-                            errMsg = self.get(rejection,"errMsg")
-                            expect(not re.search(val, relate_val),errMsg)
-                    else:
-                        raise NotImplementedError
+            assertions = self.get_children("assert",root=relation)
+            for assertion in assertions:
+                instance = self.get(assertion,"inst")
+                instance_vals = instance.split('->')
+                assert len(relate_vars)==len(instance_vals), "Wrong number of arguments in assertion "+assertion
 
+                instance_relevant = True
+                for i in range(len(relate_vars)-1):
+                    if not re.search(instance_vals[i],relate_vals[i]):
+                        instance_relevant = False
+                        break
+                if instance_relevant:
+                    errMsg = self.get(assertion,"errMsg")
+                    expect(re.search(instance_vals[-1],relate_vals[-1]),errMsg)
+
+            rejections = self.get_children("reject",root=relation)
+            for rejection in rejections:
+                instance = self.get(rejection,"inst")
+                instance_vals = instance.split('->')
+                assert len(relate_vars)==len(instance_vals), "Wrong number of arguments in rejection "+rejection
+
+                instance_relevant = True
+                for i in range(len(relate_vars)-1):
+                    if not re.search(instance_vals[i],relate_vals[i]):
+                        instance_relevant = False
+                        break
+                if instance_relevant:
+                    errMsg = self.get(rejection,"errMsg")
+                    expect(not re.search(instance_vals[-1],relate_vals[-1]),errMsg)
