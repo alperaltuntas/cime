@@ -27,6 +27,25 @@ class Compliances(GenericXML):
 
         print("Constructed Comply.")
 
+    def gen_dependency_graph(self):
+        try:
+            import graphviz
+        except:
+            raise ImportError("Cannot import graphviz library required to generate dependency graphs")
+
+        dot = graphviz.Digraph(comment='CIME XML var dependency')
+        relations = self.get_children()
+        for relation in relations:
+            relate_vars = self.get(relation,"relate").split('->')
+            for rvar in relate_vars:
+                dot.node(rvar)
+            for rvar1, rvar2 in zip(relate_vars[:-1], relate_vars[1:]):
+                dot.edge(rvar1,rvar2)
+
+        dot.render(format='png')
+        print("Dependency graph generated.")
+
+
     def check(self, case):
 
         print("-------------Checking compliances------------")
@@ -35,9 +54,9 @@ class Compliances(GenericXML):
 
         for relation in relations:
             # relate_vars: xml case vars to be checked for relational integrity
-            relate_vars = self.get(relation,"relate").split('.')
+            relate_vars = self.get(relation,"relate").split('->')
             arity = int(self.get(relation,"arity"))
-            assert arity == len(relate_vars)
+            assert arity == len(relate_vars), "Wrong arity in relation "+self.get(relation,"id")
 
             relate_vals = [] # the XML case
             for relate_var in relate_vars:
