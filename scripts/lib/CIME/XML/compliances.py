@@ -36,7 +36,7 @@ class Compliances(GenericXML):
         dot = graphviz.Digraph(comment='CIME XML var dependency')
         relations = self.get_children()
         for relation in relations:
-            relate_vars = self.get(relation,"relate").split('->')
+            relate_vars = self.get(relation,"vars").split('->')
             for rvar in relate_vars:
                 dot.node(rvar)
             for rvar1, rvar2 in zip(relate_vars[:-1], relate_vars[1:]):
@@ -48,8 +48,14 @@ class Compliances(GenericXML):
 
     def check(self, case):
 
+        def get_xml_val(xml_var, relation):
+            val = case.get_value(xml_var)
+            expect(val!=None, "Cannot find XML case var "+xml_var+" specified in"
+                            "config_compliances within the vars attributes of "+
+                            self.get(relation,"id")+" relation.")
+            return str(val)
+
         print("-------------Checking compliances------------")
-        print(self.get_id())
         relations = self.get_children()
 
         for relation in relations:
@@ -57,40 +63,38 @@ class Compliances(GenericXML):
             relate_vars = self.get(relation,"vars").split('->')
             assert len(relate_vars)>=2, "The following relation has less than two xml variables (to be split by ->):"+relate_vars
 
-            relate_vals = [] # the XML case
-            for relate_var in relate_vars:
-                relate_val = case.get_value(relate_var)
-                expect(relate_val!=None, "Cannot find XML case var "
-                    +relate_var+" specified in config_compliances as the "
-                    "relate attribute of "+self.get(relation,"id")+" relation.")
-                relate_vals.append(relate_val)
-
             assertions = self.get_children("assert",root=relation)
             for assertion in assertions:
-                instance = self.get(assertion,"inst")
+                instance = self.text(assertion)
                 instance_vals = instance.split('->')
                 assert len(relate_vars)==len(instance_vals), "Wrong number of arguments in assertion "+assertion
 
                 instance_relevant = True
                 for i in range(len(relate_vars)-1):
-                    if not re.search(instance_vals[i],relate_vals[i]):
+                    relate_val = get_xml_val(relate_vars[i],relation)
+                    if not re.search(instance_vals[i],relate_val):
                         instance_relevant = False
                         break
                 if instance_relevant:
                     errMsg = self.get(assertion,"errMsg")
-                    expect(re.search(instance_vals[-1],relate_vals[-1]),errMsg)
+                    relate_val = get_xml_val(relate_vars[-1],relation)
+                    expect(re.search(instance_vals[-1],relate_val),errMsg)
 
             rejections = self.get_children("reject",root=relation)
             for rejection in rejections:
-                instance = self.get(rejection,"inst")
+                instance = self.text(rejection)
                 instance_vals = instance.split('->')
                 assert len(relate_vars)==len(instance_vals), "Wrong number of arguments in rejection "+rejection
 
                 instance_relevant = True
                 for i in range(len(relate_vars)-1):
-                    if not re.search(instance_vals[i],relate_vals[i]):
+                    relate_val = get_xml_val(relate_vars[i],relation)
+                    if not re.search(instance_vals[i],relate_val):
                         instance_relevant = False
                         break
                 if instance_relevant:
                     errMsg = self.get(rejection,"errMsg")
-                    expect(not re.search(instance_vals[-1],relate_vals[-1]),errMsg)
+                    relate_val = get_xml_val(relate_vars[-1],relation)
+                    expect(not re.search(instance_vals[-1],relate_val),errMsg)
+
+        print("done. no compliance violation.")

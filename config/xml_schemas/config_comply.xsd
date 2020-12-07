@@ -14,34 +14,40 @@
   <xs:element name="comply">
     <xs:complexType>
       <xs:sequence>
-        <xs:element maxOccurs="unbounded" ref="relation"/>
+        <xs:element maxOccurs="unbounded" ref="relate"/>
       </xs:sequence>
       <xs:attribute ref="version" use="required"/>
     </xs:complexType>
   </xs:element>
 
-  <xs:element name="relation">
+  <xs:element name="relate">
     <xs:complexType>
       <xs:sequence>
         <xs:element minOccurs="0" maxOccurs="unbounded" ref="assert"/>
         <xs:element minOccurs="0" maxOccurs="unbounded" ref="reject"/>
       </xs:sequence>
-      <xs:attribute name="id"/> <!-- TODO: further specify-->
-      <xs:attribute ref="vars"/> <!-- TODO: further specify-->
+      <xs:attribute name="id" use="required"/> <!-- TODO: further specify-->
+      <xs:attribute ref="vars" use="required"/> <!-- TODO: further specify-->
     </xs:complexType>
   </xs:element>
 
   <xs:element name="assert">
     <xs:complexType>
-      <xs:attribute name="inst"/> <!-- TODO: further specify-->
-      <xs:attribute name="errMsg"/> <!-- TODO: further specify-->
+      <xs:simpleContent>
+        <xs:extension base="xs:string">
+          <xs:attribute name="errMsg" use="required"/> <!-- TODO: further specify-->
+        </xs:extension>
+      </xs:simpleContent>
     </xs:complexType>
   </xs:element>
 
   <xs:element name="reject">
     <xs:complexType>
-      <xs:attribute name="inst"/> <!-- TODO: further specify-->
-      <xs:attribute name="errMsg"/> <!-- TODO: further specify-->
+      <xs:simpleContent>
+        <xs:extension base="xs:string">
+          <xs:attribute name="errMsg" use="required"/> <!-- TODO: further specify-->
+        </xs:extension>
+      </xs:simpleContent>
     </xs:complexType>
   </xs:element>
 

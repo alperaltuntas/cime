@@ -3,49 +3,58 @@
 <comply version="1.1">
 
 <!-- Entries in this file, config_comply.xml, define hierarchical relations
-      among XML variables, e.g, COMPSET, GRID, etc., and any logical rules
-      that are to apply to those relations. -->
+      among XML variables, e.g, COMPSET, GRID, etc., and assertions that are
+      to apply to those relations. -->
 
 <!-- Relations that specify hierarchy only-->
-<relation vars="COMP_ATM->COMPSET" id="ATM_COMPSET"/>
-<relation vars="COMP_LND->COMPSET" id="LND_COMPSET"/>
-<relation vars="COMP_ICE->COMPSET" id="ICE_COMPSET"/>
-<relation vars="COMP_OCN->COMPSET" id="OCN_COMPSET"/>
-<relation vars="COMP_ROF->COMPSET" id="ROF_COMPSET"/>
-<relation vars="COMP_GLC->COMPSET" id="GLC_COMPSET"/>
-<relation vars="COMP_WAV->COMPSET" id="WAV_COMPSET"/>
-<relation vars="COMP_CPL->COMPSET" id="CPL_COMPSET"/>
+<relate id="ATM_COMPSET" vars="COMP_ATM->COMPSET"/>
+<relate id="LND_COMPSET" vars="COMP_LND->COMPSET"/>
+<relate id="ICE_COMPSET" vars="COMP_ICE->COMPSET"/>
+<relate id="OCN_COMPSET" vars="COMP_OCN->COMPSET"/>
+<relate id="ROF_COMPSET" vars="COMP_ROF->COMPSET"/>
+<relate id="GLC_COMPSET" vars="COMP_GLC->COMPSET"/>
+<relate id="WAV_COMPSET" vars="COMP_WAV->COMPSET"/>
+<relate id="CPL_COMPSET" vars="COMP_CPL->COMPSET"/>
 
-<relation vars="COMPSET->ATM_GRID->GRID" id="ATM_COMP_GRID"/>
-<relation vars="COMPSET->LND_GRID->GRID" id="LND_COMP_GRID"/>
-<relation vars="COMPSET->ICE_GRID->GRID" id="ICE_COMP_GRID"/>
-<relation vars="COMPSET->OCN_GRID->GRID" id="OCN_COMP_GRID"/>
-<relation vars="COMPSET->ROF_GRID->GRID" id="ROF_COMP_GRID"/>
-<relation vars="COMPSET->GLC_GRID->GRID" id="GLC_COMP_GRID"/>
-<relation vars="COMPSET->WAV_GRID->GRID" id="WAV_COMP_GRID"/>
+<relate id="ATM_COMP_GRID" vars="COMPSET->ATM_GRID->GRID"/>
+<relate id="LND_COMP_GRID" vars="COMPSET->LND_GRID->GRID"/>
+<relate id="ICE_COMP_GRID" vars="COMPSET->ICE_GRID->GRID"/>
+<relate id="OCN_COMP_GRID" vars="COMPSET->OCN_GRID->GRID"/>
+<relate id="ROF_COMP_GRID" vars="COMPSET->ROF_GRID->GRID"/>
+<relate id="GLC_COMP_GRID" vars="COMPSET->GLC_GRID->GRID"/>
+<relate id="WAV_COMP_GRID" vars="COMPSET->WAV_GRID->GRID"/>
 
 <!-- Relations that specify (in)compatibilities -->
-<relation vars="COMP_OCN->COMP_WAV" id="MOM6_WAV_COUPLING">
-  <reject inst="mom->ww" errMsg="MOM6 cannot be coupled with WW3."/>
-</relation>
+<relate id="MOM6_WAV_COUPLING" vars="COMP_OCN->COMP_WAV">
+  <assert errMsg="MOM6 cannot be coupled with active or data wave components.">mom->swav</assert>
+</relate>
 
-<relation vars="COMP_OCN->COMP_GLC" id="MOM6_GLC_COUPLING">
-  <reject inst="mom->cism" errMsg="MOM6 cannot be coupled with CISM."/>
-</relation>
+<relate id="MOM6_GLC_COUPLING" vars="COMP_OCN->COMP_GLC">
+  <reject errMsg="MOM6 cannot be coupled with CISM.">mom->cism</reject>
+</relate>
 
-<relation vars="COMPSET->COMPSET" id="MOM6_COMPSETS">
-  <assert inst="MOM6->DLND|CLM|DICE|CICE"     errMsg="LND or ICE must be present to hide MOM6 grid poles."/>
-  <assert inst="MOM6%BGC->CLM%BGC|SLND|DLND"  errMsg="In BGC mode, MOM6 requires CLM%BGC or no CLM at all"/>
-  <reject inst="MOM6->CAM[456]%SCAM"          errMsg="MOM6 cannot be coupled to single column CAM (SCAM)."/>
-</relation>
+<relate id="MOM6_COMPSETS" vars="COMPSET->COMPSET">
+  <assert errMsg="LND or ICE must be present to hide MOM6 grid poles.">MOM6->DLND|CLM|DICE|CICE</assert>
+  <assert errMsg="In BGC mode, MOM6 requires CLM%BGC or no CLM at all">MOM6%BGC->CLM%BGC|SLND|DLND</assert>
+  <reject errMsg="MOM6 cannot be coupled to single column CAM (SCAM).">MOM6->CAM[456]%SCAM"</reject>
+</relate>
 
-<!-- TODO: potential application of arity greater then two: relate="COMPSET.COMPSET.OCN_DOMAIN
- Check if LND or ICE is present only if OCN_DOMAIN is not REGIONAL, i.e., spherical
--->
+<relate id="MOM6_COMPSETS_IMPROVED" vars="COMPSET->COMPSET->COMPSET">
+  <assert errMsg="LND or ICE must be present to hide MOM6 grid poles.">MOM6->SLND.+SICE->MOM6%REGIONAL</assert>
+</relate>
 
-<!-- TODO: add a mechanism to prevent defining relations/assertions already expressible in
-existing xml files via existing metada. An example: There shouldn't be a GRID.COMPONENT
-relation. That relation is perfectly expressible in config_grids.xml
+<relate id="MOM6_COMPSETS_IMPROVED" vars="COMPSET->COMPSET->COMPSET">
+  <assert errMsg="LND or ICE must be present to hide MOM6 grid poles.">MOM6->SLND.+SICE->MOM6%REGIONAL</assert>
+</relate>
+
+<relate id="MOM6_CICE_THERMO" vars="MOM6_THERMO->COMP_ICE->CICE_MODE">
+  <assert errMsg="MOM6 Frazil mode is incompatible with CICE config.">True->CICE->prognostic|prescribed</assert>
+</relate>
+
+<!-- TODO: prevent defining (in)compatibilites already defined in existing metadata
+<disallowed_relations>
+  <vars="GRID->COMPSET"/>
+</disallowed_relations>
 -->
 
 </comply>
