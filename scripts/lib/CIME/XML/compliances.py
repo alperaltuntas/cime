@@ -36,7 +36,7 @@ class Compliances(GenericXML):
         dot = graphviz.Digraph(comment='CIME XML var dependency')
         relations = self.get_children()
         for relation in relations:
-            relate_vars = self.get(relation,"vars").split('->')
+            relate_vars = self.get(relation,"vars").split('~')
             for rvar in relate_vars:
                 dot.node(rvar)
             for rvar1, rvar2 in zip(relate_vars[:-1], relate_vars[1:]):
@@ -60,13 +60,13 @@ class Compliances(GenericXML):
 
         for relation in relations:
             # relate_vars: xml case vars to be checked for relational integrity
-            relate_vars = self.get(relation,"vars").split('->')
-            assert len(relate_vars)>=2, "The following relation has less than two xml variables (to be split by ->):"+relate_vars
+            relate_vars = self.get(relation,"vars").split('~')
+            assert len(relate_vars)>=2, "The following relation has less than two xml variables (to be split by ~):"+relate_vars
 
             assertions = self.get_children("assert",root=relation)
             for assertion in assertions:
                 instance = self.text(assertion)
-                instance_vals = instance.split('->')
+                instance_vals = instance.split('~')
                 assert len(relate_vars)==len(instance_vals), "Wrong number of arguments in assertion "+assertion
 
                 instance_relevant = True
@@ -83,7 +83,7 @@ class Compliances(GenericXML):
             rejections = self.get_children("reject",root=relation)
             for rejection in rejections:
                 instance = self.text(rejection)
-                instance_vals = instance.split('->')
+                instance_vals = instance.split('~')
                 assert len(relate_vars)==len(instance_vals), "Wrong number of arguments in rejection "+rejection
 
                 instance_relevant = True

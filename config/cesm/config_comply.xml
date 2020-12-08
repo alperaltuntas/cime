@@ -7,53 +7,56 @@
       to apply to those relations. -->
 
 <!-- Relations that specify hierarchy only-->
-<relate id="ATM_COMPSET" vars="COMP_ATM->COMPSET"/>
-<relate id="LND_COMPSET" vars="COMP_LND->COMPSET"/>
-<relate id="ICE_COMPSET" vars="COMP_ICE->COMPSET"/>
-<relate id="OCN_COMPSET" vars="COMP_OCN->COMPSET"/>
-<relate id="ROF_COMPSET" vars="COMP_ROF->COMPSET"/>
-<relate id="GLC_COMPSET" vars="COMP_GLC->COMPSET"/>
-<relate id="WAV_COMPSET" vars="COMP_WAV->COMPSET"/>
-<relate id="CPL_COMPSET" vars="COMP_CPL->COMPSET"/>
+<relate id="ATM_COMPSET" vars="COMP_ATM~COMPSET"/>
+<relate id="LND_COMPSET" vars="COMP_LND~COMPSET"/>
+<relate id="ICE_COMPSET" vars="COMP_ICE~COMPSET"/>
+<relate id="OCN_COMPSET" vars="COMP_OCN~COMPSET"/>
+<relate id="ROF_COMPSET" vars="COMP_ROF~COMPSET"/>
+<relate id="GLC_COMPSET" vars="COMP_GLC~COMPSET"/>
+<relate id="WAV_COMPSET" vars="COMP_WAV~COMPSET"/>
+<relate id="CPL_COMPSET" vars="COMP_CPL~COMPSET"/>
 
-<relate id="ATM_COMP_GRID" vars="COMPSET->ATM_GRID->GRID"/>
-<relate id="LND_COMP_GRID" vars="COMPSET->LND_GRID->GRID"/>
-<relate id="ICE_COMP_GRID" vars="COMPSET->ICE_GRID->GRID"/>
-<relate id="OCN_COMP_GRID" vars="COMPSET->OCN_GRID->GRID"/>
-<relate id="ROF_COMP_GRID" vars="COMPSET->ROF_GRID->GRID"/>
-<relate id="GLC_COMP_GRID" vars="COMPSET->GLC_GRID->GRID"/>
-<relate id="WAV_COMP_GRID" vars="COMPSET->WAV_GRID->GRID"/>
+<relate id="ATM_COMP_GRID" vars="COMPSET~ATM_GRID~GRID"/>
+<relate id="LND_COMP_GRID" vars="COMPSET~LND_GRID~GRID"/>
+<relate id="ICE_COMP_GRID" vars="COMPSET~ICE_GRID~GRID"/>
+<relate id="OCN_COMP_GRID" vars="COMPSET~OCN_GRID~GRID"/>
+<relate id="ROF_COMP_GRID" vars="COMPSET~ROF_GRID~GRID"/>
+<relate id="GLC_COMP_GRID" vars="COMPSET~GLC_GRID~GRID"/>
+<relate id="WAV_COMP_GRID" vars="COMPSET~WAV_GRID~GRID"/>
 
 <!-- Relations that specify (in)compatibilities -->
-<relate id="MOM6_WAV_COUPLING" vars="COMP_OCN->COMP_WAV">
-  <assert errMsg="MOM6 cannot be coupled with active or data wave components.">mom->swav</assert>
+<relate id="MOM6_WAV_COUPLING" vars="COMP_OCN~COMP_WAV">
+  <assert errMsg="MOM6 cannot be coupled with active or data wave components.">mom~swav</assert>
 </relate>
 
-<relate id="MOM6_GLC_COUPLING" vars="COMP_OCN->COMP_GLC">
-  <reject errMsg="MOM6 cannot be coupled with CISM.">mom->cism</reject>
+<relate id="MOM6_GLC_COUPLING" vars="COMP_OCN~COMP_GLC">
+  <reject errMsg="MOM6 cannot be coupled with CISM.">mom~cism</reject>
 </relate>
 
-<relate id="MOM6_COMPSETS" vars="COMPSET->COMPSET">
-  <assert errMsg="LND or ICE must be present to hide MOM6 grid poles.">MOM6->DLND|CLM|DICE|CICE</assert>
-  <assert errMsg="In BGC mode, MOM6 requires CLM%BGC or no CLM at all">MOM6%BGC->CLM%BGC|SLND|DLND</assert>
-  <reject errMsg="MOM6 cannot be coupled to single column CAM (SCAM).">MOM6->CAM[456]%SCAM"</reject>
+<relate id="MOM6_POLE_HIDING" vars="COMP_OCN~COMP_LND~COMP_ICE">
+  <reject errMsg="LND or ICE must be present to hide MOM6 grid poles">mom~slnd~sice</reject>
 </relate>
 
-<relate id="MOM6_COMPSETS_IMPROVED" vars="COMPSET->COMPSET->COMPSET">
-  <assert errMsg="LND or ICE must be present to hide MOM6 grid poles.">MOM6->SLND.+SICE->MOM6%REGIONAL</assert>
+<relate id="MOM6_COMPSETS" vars="COMPSET~COMPSET">
+  <assert errMsg="In BGC mode, MOM6 requires CLM%BGC or no CLM at all">MOM6%BGC~CLM%BGC|SLND|DLND</assert>
+  <reject errMsg="MOM6 cannot be coupled to single column CAM (SCAM).">MOM6~CAM[456]%SCAM"</reject>
 </relate>
 
-<relate id="MOM6_COMPSETS_IMPROVED" vars="COMPSET->COMPSET->COMPSET">
-  <assert errMsg="LND or ICE must be present to hide MOM6 grid poles.">MOM6->SLND.+SICE->MOM6%REGIONAL</assert>
+<relate id="MOM6_COMPSETS_IMPROVED" vars="COMPSET~COMPSET~COMPSET">
+  <assert errMsg="LND or ICE must be present to hide MOM6 grid poles.">MOM6~SLND.+SICE~MOM6%REGIONAL</assert>
 </relate>
 
-<relate id="MOM6_CICE_THERMO" vars="MOM6_THERMO->COMP_ICE->CICE_MODE">
-  <assert errMsg="MOM6 Frazil mode is incompatible with CICE config.">True->CICE->prognostic|prescribed</assert>
+<relate id="MOM6_COMPSETS_IMPROVED" vars="COMPSET~COMPSET~COMPSET">
+  <assert errMsg="LND or ICE must be present to hide MOM6 grid poles.">MOM6~SLND.+SICE~MOM6%REGIONAL</assert>
+</relate>
+
+<relate id="MOM6_CICE_THERMO" vars="MOM6_THERMO~COMP_ICE~CICE_MODE">
+  <assert errMsg="MOM6 Frazil mode is incompatible with CICE config.">True~CICE~prognostic|prescribed</assert>
 </relate>
 
 <!-- TODO: prevent defining (in)compatibilites already defined in existing metadata
 <disallowed_relations>
-  <vars="GRID->COMPSET"/>
+  <vars="GRID~COMPSET"/>
 </disallowed_relations>
 -->
 
