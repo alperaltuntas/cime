@@ -1,0 +1,131 @@
+#!/usr/bin/env python
+"""
+test_compliances
+"""
+
+from Tools.standard_script_setup import *
+import re
+from CIME.utils             import expect, get_model
+from CIME.XML.files         import Files
+from CIME.XML.component     import Component
+from CIME.XML.compsets      import Compsets
+from CIME.XML.grids         import Grids
+from CIME.XML.compliances   import Compliances
+from argparse               import RawTextHelpFormatter
+
+logger = logging.getLogger(__name__)
+supported_comp_interfaces = ["mct", "nuopc", "moab"]
+
+def query_grids(files, long_output, xml=False):
+    """
+    query all grids.
+    """
+    config_file = files.get_value("GRIDS_SPEC_FILE")
+    expect(os.path.isfile(config_file),
+           "Cannot find config_file {} on disk".format(config_file))
+
+    grids = Grids(config_file)
+    if xml:
+        print("{}".format(grids.get_raw_record()))
+    elif long_output:
+        grids.print_values(long_output=long_output)
+    else:
+        grids.print_values()
+
+def query_compsets(files, name, xml=False):
+    """
+    query compset definition give a compset name
+    """
+    # Determine valid component values by checking the value attributes for COMPSETS_SPEC_FILE
+    components = get_compsets(files)
+    match_found = None
+    all_components = False
+    if re.search("^all$", name):  # print all compsets
+        match_found = name
+        all_components = True
+    else:
+        for component in components:
+            if component == name:
+                match_found = name
+                break
+
+    # If name is not a valid argument - exit with error
+    expect(match_found is not None,
+           "Invalid input argument {}, valid input arguments are {}".format(name, components))
+
+    if all_components:  # print all compsets
+        for component in components:
+            # the all_components flag will only print available components
+            print_compset(component, files, all_components=all_components, xml=xml)
+    else:
+        print_compset(name, files, xml=xml)
+
+def print_compset(name, files, all_components=False, xml=False):
+    """
+    print compsets associated with the component name, but if all_components is true only
+    print the details if the associated component is available
+    """
+
+    # Determine the config_file for the target component
+    config_file = files.get_value("COMPSETS_SPEC_FILE", attribute={"component":name})
+    # only error out if we aren't printing all otherwise exit quitely
+    if not all_components:
+        expect((config_file),
+            "Cannot find any config_component.xml file for {}".format(name))
+
+        # Check that file exists on disk
+        expect(os.path.isfile(config_file),
+            "Cannot find config_file {} on disk".format(config_file))
+    elif config_file is None or not os.path.isfile(config_file):
+        return
+
+    if get_model() == 'ufs' and name == 'drv':
+        return
+
+    print("\nActive component: {}".format(name))
+    # Now parse the compsets file and write out the compset alias and longname as well as the help text
+    # determine component xml content
+    compsets = Compsets(config_file)
+    # print compsets associated with component without help text
+    if xml:
+        print("{}".format(compsets.get_raw_record()))
+    else:
+        compsets.print_values(arg_help=False)
+
+def get_compsets(files):
+    """
+    Determine valid component values by checking the value attributes for COMPSETS_SPEC_FILE
+    """
+    return files.get_components("COMPSETS_SPEC_FILE")
+
+def get_components(files):
+    """
+    Determine the valid component classes (e.g. atm) for the driver/cpl
+    These are then stored in comps_array
+    """
+    infile = files.get_value("CONFIG_CPL_FILE")
+    config_drv = Component(infile, "CPL")
+    return config_drv.get_valid_model_components()
+
+def _main_func(description):
+    """
+    main function
+    """
+    grids, compsets, components, long_output, xml, files = parse_command_line(sys.argv, description)
+
+
+    if grids:
+        query_grids(files, long_output, xml=xml)
+
+    if compsets is not None:
+        query_compsets(files, name=compsets, xml=xml)
+
+
+def _main_test():
+    files = Files()
+    compliances = Compliances(files=files)
+    compliances.gen_dependency_graph()
+
+# main entry point
+if __name__ == "__main__":
+    _main_test()

@@ -35,6 +35,7 @@ from CIME.XML.env_archive           import EnvArchive
 from CIME.XML.env_batch             import EnvBatch
 from CIME.XML.env_workflow          import EnvWorkflow
 from CIME.XML.generic_xml           import GenericXML
+from CIME.XML.compliances           import Compliances
 from CIME.user_mod_support          import apply_user_mods
 from CIME.aprun import get_aprun_cmd_for_case
 
@@ -593,6 +594,7 @@ class Case(object):
             match = Case.__mod_match_re__.match(model.lower())
             expect(match is not None, "No model match for {}".format(model))
             mod_match = match.group(1)
+            print(mod_match, "aaa", comp_hash)
             # Check for noncomponent appends (BGC & TEST)
             if mod_match in ('bgc', 'test'):
                 noncomps.append(model)
@@ -1135,6 +1137,13 @@ class Case(object):
 
         if input_dir is not None:
             self.set_value("DIN_LOC_ROOT", os.path.abspath(input_dir))
+
+        #--------------------------------------------
+        # compliances
+        #--------------------------------------------
+
+        compliances = Compliances(files=files)
+        compliances.check(case=self)
 
     def get_compset_var_settings(self, files):
         infile=files.get_value("COMPSETS_SPEC_FILE",
