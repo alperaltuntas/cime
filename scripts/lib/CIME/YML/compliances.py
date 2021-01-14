@@ -30,12 +30,12 @@ class Compliances(ParamGen):
         ParamGen.__init__(self, data_dict, match)
  
     @classmethod
-    def from_cime(self, infile=None, files=None, match='last'):
+    def from_cime(cls, infile=None, files=None, match='last'):
         if files is None:
             files = Files()
         if infile is None:
             infile = files.get_value("COMPLY_SPEC_FILE")
-        raise NotImplementedError # continue developing this method
+        return cls.from_yaml(infile)
 
     @staticmethod
     def _split_assertion_expr(assertion):

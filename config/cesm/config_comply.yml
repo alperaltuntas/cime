@@ -1,0 +1,6 @@
+$COMP_OCN == "mom":
+    - assert $COMP_WAV == "swav", "MOM6 cannot be coupled with active or data wave components."
+    - assert $COMP_GLC != "cism", "MOM6 cannot be coupled with CISM."
+    - assert $COMP_LND != "slnd" or $COMP_ICE != "sice", "LND or ICE must be present to hide MOM6 grid poles."
+    - '"MOM6%BGC" in $COMPSET':
+        assert any(l in $COMPSET for l in ["CLM%BGC", "SLND", "DLND"]), "In BGC mode, MOM6 requires CLM%BGC or no CLM at all."
