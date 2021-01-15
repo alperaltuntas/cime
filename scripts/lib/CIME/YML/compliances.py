@@ -18,17 +18,18 @@ logger = logging.getLogger(__name__)
 #           assert expr2, errMsg
 # is interpreted as (expr1 -> expr2), where expr1 is the antecedent expr2 is the consequent,
 # and errMsg is the message to be printed if the implication evaluates to False.
-Implication = namedtuple('Implication', ['antecedents', 'consequent', 'errMsg'])
+Implication = namedtuple('Implication', ['antecedents', 'consequent', 'errMsg', 'variables'])
 
 class Compliances(ParamGen):
 
     def __init__(self, data_dict, match='last'):
-        self._implications = []         # i.e., relations
-        self._var_implications = {}     # mapping from varname to set of implication id's involving var
-        self._vars_related = {} 
+        self._implications = [] # i.e., relations
+        self._var_impl_idx = {} # mapping from varname to set of implication id's involving var
+        self._vars_related = {}
 
         ParamGen.__init__(self, data_dict, match)
- 
+
+
     @classmethod
     def from_cime(cls, infile=None, files=None, match='last'):
         if files is None:
@@ -48,26 +49,34 @@ class Compliances(ParamGen):
         errMsg = errMsgTemp[1:].strip()
         expr = exprTemp.replace('assert','',1).split(',')[0].strip() # this is wrong, there is no guarantee of having a single comma in data
         return expr, errMsg
-    
-    
+
+    def implications(self, varname=None):
+        if varname==None:
+            return self._implications.copy()
+        else:
+            var_implications = []
+            if varname in self._var_impl_idx:
+                var_implications = [self._implications[idx] for idx in self._var_impl_idx[varname]]
+            return var_implications
+
     def _add_implication(self, antecedents, consequent, errMsg):
         """adds an implication in the form of antecedents -> consequent."""
         cond_id = len(self._implications)
-        self._implications.append(Implication(antecedents, consequent, errMsg))
         assertion_expr = 'not({}) or {}'.format( ' and '.join(antecedents), consequent)
         expandable_vars = get_expandable_vars(assertion_expr)
+        self._implications.append(Implication(antecedents, consequent, errMsg, expandable_vars))
         for var in expandable_vars:
-            if not var in self._var_implications:
-                self._var_implications[var] = set()
+            if not var in self._var_impl_idx:
+                self._var_impl_idx[var] = set()
                 self._vars_related[var] = set()
-            self._var_implications[var].add(cond_id)
+            self._var_impl_idx[var].add(cond_id)
             for var_other in set(expandable_vars) - {var}:
                 self._vars_related[var].add(var_other)
 
     def unfold_implications(self):
-        def _unfold_implications_recursive(data, antecedents=[]):               
+        def _unfold_implications_recursive(data, antecedents=[]):
             if isinstance(data, dict):
-                
+
                 for guard, val in data.items():
                     if isinstance(val, list):
                         for item in val:
@@ -79,24 +88,27 @@ class Compliances(ParamGen):
             elif isinstance(data, str):
                 consequent, errMsg = Compliances._split_assertion_expr(data)
                 self._add_implication(antecedents, consequent, errMsg)
-                
         _unfold_implications_recursive(self.data)
-        
+
+    @staticmethod
+    def check_implication(implication, expand_func):
+        implication_relevant = True
+        for antecedent in implication.antecedents:
+            antecedent_expanded = ParamGen._expand_vars(antecedent, expand_func)
+            antecedent_eval = eval_formula(antecedent_expanded)
+            if antecedent_eval != True:
+                implication_relevant = False
+                break
+        if implication_relevant:
+            consequent_expanded = ParamGen._expand_vars(implication.consequent, expand_func)
+            assert eval_formula(consequent_expanded), implication.errMsg
+
+
     def check_config(self, expand_func):
         assert callable(expand_func), "Must provide expand_func function"
-        
         for implication in self._implications:
-            implication_relevant = True
-            for antecedent in implication.antecedents:
-                antecedent_expanded = ParamGen._expand_vars(antecedent, expand_func)
-                antecedent_eval = eval_formula(antecedent_expanded)
-                if antecedent_eval != True:
-                    implication_relevant = False
-                    break
-            if implication_relevant:
-                consequent_expanded = ParamGen._expand_vars(implication.consequent, expand_func)
-                assert eval_formula(consequent_expanded), implication.errMsg
-            
+            Compliances.check_implication(implication, expand_func)
+
 
 '''
     def gen_dependency_graph(self):
