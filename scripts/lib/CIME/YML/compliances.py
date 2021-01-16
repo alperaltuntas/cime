@@ -47,9 +47,10 @@ class Compliances(ParamGen):
         errMsgTemp = re.findall('(,\s*"[^"]*"$|,\s*\'[^\']*\'$)',assertion)
         assert len(errMsgTemp)==1, "Cannot parse assertion "+assertion
         errMsgTemp = errMsgTemp[0]
-        exprTemp = assertion[:len(errMsgTemp)]
         errMsg = errMsgTemp[1:].strip()
-        expr = exprTemp.replace('assert','',1).split(',')[0].strip() # this is wrong, there is no guarantee of having a single comma in data
+        expr = assertion\
+                .replace(errMsgTemp,'')\
+                .replace('assert','',1).strip()
         return expr, errMsg
 
     def implications(self, varname=None):
