@@ -453,8 +453,12 @@ def _build_libraries(case, exeroot, sharedpath, caseroot, cimeroot, libroot, lid
         expect(os.path.exists(my_file),"Build script {} for component {} not found.".format(my_file, lib))
         logger.info("Building {} with output to file {}".format(lib,file_build))
 
-        run_sub_or_cmd(my_file, [full_lib_path, os.path.join(exeroot, sharedpath), caseroot], 'buildlib',
-                       [full_lib_path, os.path.join(exeroot, sharedpath), case], logfile=file_build)
+        if lib=='FMS':
+            run_sub_or_cmd(my_file, [full_lib_path, os.path.join(exeroot, sharedpath), caseroot], 'buildlib',
+                          [full_lib_path, os.path.join(exeroot, sharedpath), caseroot], logfile=file_build)
+        else:
+            run_sub_or_cmd(my_file, [full_lib_path, os.path.join(exeroot, sharedpath), caseroot], 'buildlib',
+                          [full_lib_path, os.path.join(exeroot, sharedpath), case], logfile=file_build)
 
         analyze_build_log(lib, file_build, compiler)
         logs.append(file_build)
