@@ -107,6 +107,19 @@
       <grid name="rof">rx1</grid>
     </model_grid>
 
+    <model_grid alias="mep15_t061" not_compset="_CAM">
+      <grid name="atm">mep1.5km</grid>
+      <grid name="lnd">mep1.5km</grid>
+      <grid name="ocnice">tx0.66v1</grid>
+    </model_grid>
+
+    <model_grid alias="mep15_ETP" not_compset="_CAM">
+      <grid name="atm">mep1.5km</grid>
+      <grid name="lnd">mep1.5km</grid>
+      <grid name="ocnice">ETP</grid>
+      <grid name="rof">rx1</grid>
+    </model_grid>
+
     <model_grid alias="g17_g17" compset="DATM.+DROF">
       <grid name="atm">gx1v7</grid>
       <grid name="lnd">gx1v7</grid>
@@ -1976,6 +1989,12 @@
       <mesh driver="nuopc">/glade/scratch/bachman/cesm2_ETP/INPUT/ETP_20_grid_SCRIP_ESMFmesh.nc</mesh>
       <desc>Eastern tropical Pacific at 1/20 degree resolution</desc>
       <support>Experimental for MOM6 regional experiments</support>
+    </domain>
+
+    <domain name="mep1.5km">
+      <nx>17672857</nx> <ny>1</ny>
+      <mesh driver="nuopc">/glade/work/altuntas/cesm.input/mesh/mpas_ep/mpas_ep_210301_ESMFmesh.nc</mesh>
+      <desc>MPAS 35-1.5-km variable-uniform mesh</desc>
     </domain>
 
     <domain name="tx0.1v2">
