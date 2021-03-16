@@ -120,6 +120,20 @@
       <grid name="rof">rx1</grid>
     </model_grid>
 
+    <model_grid alias="mep15_ETP_20" not_compset="_CAM">
+      <grid name="atm">mep1.5km</grid>
+      <grid name="lnd">mep1.5km</grid>
+      <grid name="ocnice">ETP_20</grid>
+      <grid name="rof">rx1</grid>
+    </model_grid>
+
+    <model_grid alias="mep15_ETP_100" not_compset="_CAM">
+      <grid name="atm">mep1.5km</grid>
+      <grid name="lnd">mep1.5km</grid>
+      <grid name="ocnice">ETP_100</grid>
+      <grid name="rof">rx1</grid>
+    </model_grid>
+
     <model_grid alias="g17_g17" compset="DATM.+DROF">
       <grid name="atm">gx1v7</grid>
       <grid name="lnd">gx1v7</grid>
