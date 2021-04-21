@@ -1,6 +1,29 @@
 $COMP_OCN == "mom":
-    - assert $COMP_WAV == "swav", "MOM6 cannot be coupled with active or data wave components."
-    - assert $COMP_GLC != "cism", "MOM6 cannot be coupled with CISM."
-    - assert $COMP_LND != "slnd" or $COMP_ICE != "sice", "LND or ICE must be present to hide MOM6 grid poles."
-    - '"MOM6%BGC" in $COMPSET':
-        assert any(l in $COMPSET for l in ["CLM%BGC", "SLND", "DLND"]), "In BGC mode, MOM6 requires CLM%BGC or no CLM at all."
+    - <-> assert $COMP_WAV not in ["ww3", "dwav"], "MOM6 cannot be coupled with active or data wave components."
+    - <-> assert $COMP_GLC != "cism", "MOM6 cannot be coupled with CISM."
+    - <-> assert $COMP_LND != "slnd" or $COMP_ICE != "sice", "LND or ICE must be present to hide MOM6 grid poles."
+
+$COMP_ATM_PHYS == "CAM60":
+    <-> assert $COMP_ICE_OPTION != "CICE4", "Cannot couple CAM6 and CICE4."
+
+$COMP_ATM == "cam":
+    <-> assert $COMP_ICE != "sice" or $COMP_LND != "slnd", "When CAM is active, either ICE or LND must be non-stub."
+
+"'BGC' in $COMP_LND_OPTION":
+    $COMP_OCN_PHYS == "POP2":
+        <-> assert "ECO" in $COMP_OCN_OPTION, "POP must be in ECO mode if land is in BGC mode."
+
+"'BGC' in $COMP_LND_OPTION and $COMP_OCN == 'POP'":
+    <-> assert "ECO" in $COMP_OCN_OPTION, "POP must be in BGC mode if land is too."
+
+$COMP_ROF == "mosart":
+    <-> assert $COMP_ICE_OPTION != "CICE4", "Cannot couple MOSART and CICE4"
+
+$COMP_ICE == 'dice':
+    -> assert $COMP_ICE_OPTION != "(none)", "Must pick a valid DICE option"
+
+$COMP_ATM == 'datm':
+    -> assert $COMP_ATM_OPTION != "(none)", "Must pick a valid DATM option"
+
+$COMP_ROF == 'drof':
+    -> assert $COMP_ROF_OPTION != "(none)", "Must pick a valid DROF option"
