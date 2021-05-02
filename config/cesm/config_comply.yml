@@ -1,29 +1,31 @@
-$COMP_OCN == "mom":
-    - <-> assert $COMP_WAV not in ["ww3", "dwav"], "MOM6 cannot be coupled with active or data wave components."
-    - <-> assert $COMP_GLC != "cism", "MOM6 cannot be coupled with CISM."
-    - <-> assert $COMP_LND != "slnd" or $COMP_ICE != "sice", "LND or ICE must be present to hide MOM6 grid poles."
+# In this initial version of config_comply.yml, the constraints are to test
+# the infrastructure and the GUI only. These constraints will not necessarily be
+# included in the final version of this file to be released in a stable version.
 
-$COMP_ATM_PHYS == "CAM60":
-    <-> assert $COMP_ICE_OPTION != "CICE4", "Cannot couple CAM6 and CICE4."
-
-$COMP_ATM == "cam":
-    <-> assert $COMP_ICE != "sice" or $COMP_LND != "slnd", "When CAM is active, either ICE or LND must be non-stub."
-
-"'BGC' in $COMP_LND_OPTION":
-    $COMP_OCN_PHYS == "POP2":
-        <-> assert "ECO" in $COMP_OCN_OPTION, "POP must be in ECO mode if land is in BGC mode."
-
-"'BGC' in $COMP_LND_OPTION and $COMP_OCN == 'POP'":
-    <-> assert "ECO" in $COMP_OCN_OPTION, "POP must be in BGC mode if land is too."
-
-$COMP_ROF == "mosart":
-    <-> assert $COMP_ICE_OPTION != "CICE4", "Cannot couple MOSART and CICE4"
+# Invariants
+"True":
+    - assert not ($COMP_ATM=="cam" and $COMP_ICE=="sice" and $COMP_LND=="slnd"),    "When CAM is active, either ICE or LND must be non-stub."
+    - assert not ($COMP_OCN=="mom") or $COMP_WAV not in ["ww3", "dwav"],            "MOM6 cannot be coupled with active or data wave components."
+    - assert not ($COMP_OCN=="mom") or $COMP_GLC != "cism",                         "MOM6 cannot be coupled with CISM."
+    - assert not ($COMP_OCN=="mom") or $COMP_LND != "slnd" or $COMP_ICE != "sice",  "LND or ICE must be present to hide MOM6 grid poles."
+    - assert not ($COMP_ATM_PHYS == "CAM60") or $COMP_ICE_OPTION != "CICE4",        "Cannot couple CAM6 and CICE4."
 
 $COMP_ICE == 'dice':
-    -> assert $COMP_ICE_OPTION != "(none)", "Must pick a valid DICE option"
+    assert $COMP_ICE_OPTION != "(none)", "Must pick a valid DICE option."
 
 $COMP_ATM == 'datm':
-    -> assert $COMP_ATM_OPTION != "(none)", "Must pick a valid DATM option"
+    assert $COMP_ATM_OPTION != "(none)", "Must pick a valid DATM option."
 
 $COMP_ROF == 'drof':
-    -> assert $COMP_ROF_OPTION != "(none)", "Must pick a valid DROF option"
+    assert $COMP_ROF_OPTION != "(none)", "Must pick a valid DROF option."
+
+$COMP_LND == 'clm' and $COMP_OCN == 'pop' and ('BGC' in $COMP_LND_OPTION or 'ECO' in $COMP_OCN_OPTION):
+    assert ('BGC' in $COMP_LND_OPTION) == ('ECO' in $COMP_OCN_OPTION),  "POP must be in BGC mode if land is too, and vice versa."
+
+$COMP_ATM == 'datm' and $COMP_ROF == 'drof' and ($COMP_ROF_OPTION == 'JRA' or $COMP_ATM_OPTION == 'JRA'):
+    assert ($COMP_ROF_OPTION == 'JRA') == ($COMP_ATM_OPTION == 'JRA'), "IF DROF is set to be JRA, then DATM must be too."
+
+### Safety rules to be checked:
+# (1) Each option must eventually be eligible.
+# (2) At least one option of a particular eligible variable must be eligible at any time.
+# (3) No unrecoverable vicious cycle: e.g., user must be able to "undo" a selection of a variable e.g., by changing other variables
