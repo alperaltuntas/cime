@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 #           assert expr2, errMsg
 # is interpreted as (expr1 -> expr2), where expr1 is the antecedent expr2 is the consequent,
 # and errMsg is the message to be printed if the implication evaluates to False.
-Implication = namedtuple('Implication', ['antecedents', 'consequent', 'errMsg', 'biimp', 'variables', 'full_expr'])
+Implication = namedtuple('Implication', ['antecedents', 'consequents', 'errMsg', 'variables', 'full_expr'])
 
 class Compliances(ParamGen):
 
@@ -62,19 +62,22 @@ class Compliances(ParamGen):
                 var_implications = [self._implications[idx] for idx in self._var_impl_idx[varname]]
             return var_implications
 
-    def _add_implication(self, antecedents, consequent, errMsg, biimp):
-        """adds an implication in the form of antecedents -> consequent."""
+    def _add_implication(self, antecedents, consequents, errMsg):
+        """adds an implication in the form of antecedents -> consequents."""
         cond_id = len(self._implications)
-        full_expr = 'not({}) or ({})'.format( ' and '.join(antecedents), consequent)
+        full_expr = 'not({}) or ({})'.\
+            format( ' and '.join(antecedents),
+                    ' and '.join(consequents))
         logger.debug("Adding implication: {}".format(full_expr))
-        impl_vars = get_expandable_vars(full_expr) # all variables involved in implication
-        self._implications.append(Implication(antecedents, consequent, errMsg, biimp, impl_vars, full_expr))
-        for var in impl_vars:
+        all_vars = get_expandable_vars(full_expr) # all variables involved in implication
+        consequent_vars = get_expandable_vars(' and '.join(consequents)) # all variables involved in implication
+        self._implications.append(Implication(antecedents, consequents, errMsg, all_vars, full_expr))
+        for var in consequent_vars:
             if not var in self._var_impl_idx:
                 self._var_impl_idx[var] = set()
                 self._vars_related[var] = set()
             self._var_impl_idx[var].add(cond_id)
-            for var_other in set(impl_vars) - {var}:
+            for var_other in set(consequent_vars) - {var}:
                 self._vars_related[var].add(var_other)
 
     def unfold_implications(self):
@@ -91,12 +94,8 @@ class Compliances(ParamGen):
                     else:
                         raise RuntimeError("Invalid Compliances DPD.")
             elif isinstance(data, str):
-                assert data.split()[0] in ['->', '<->'], "Couldn't find bi-implication indicator"
-                biimp = True
-                if data.split()[0] == '->':
-                    biimp = False
-                consequent, errMsg = Compliances._split_assertion_expr(data[3:])
-                self._add_implication(antecedents, consequent, errMsg, biimp)
+                consequent, errMsg = Compliances._split_assertion_expr(data)
+                self._add_implication(antecedents, [consequent], errMsg)
         _unfold_implications_recursive(self.data)
 
     @staticmethod
@@ -104,24 +103,25 @@ class Compliances(ParamGen):
         logger.debug("Checking implication: {}".format(implication.full_expr))
         implication_relevant = True
         for antecedent in implication.antecedents:
-            if implication.biimp:
-                antecedent_expanded = ParamGen._expand_vars(antecedent, expand_func_opt)
-            else:
-                antecedent_expanded = ParamGen._expand_vars(antecedent, expand_func)
+            antecedent_expanded = ParamGen._expand_vars(antecedent, expand_func)
+            if "None" in antecedent_expanded:
+                logger.debug("Antecedent includes 'None' value(s), i.e., uninitialized vars. Skipping evaluation...")
+                implication_relevant = False
+                break
             antecedent_eval = eval_formula(antecedent_expanded)
             if antecedent_eval != True:
                 implication_relevant = False
                 break
         if implication_relevant:
             logger.debug("Implication is relevant.")
-            consequent_expanded = ParamGen._expand_vars(implication.consequent, expand_func_opt)
-            logger.debug("Implication is relevant.")
-            if "None" in consequent_expanded:
-                logger.debug("Consequent includes 'None' value(s), i.e., uninitialized vars. Skipping evaluation...")
-                return 
-            logger.debug("Conseequent expanded: {}".format(consequent_expanded))
-            logger.debug("Implication evaluation: {}".format(eval_formula(consequent_expanded)))
-            assert eval_formula(consequent_expanded), implication.errMsg
+            for consequent in implication.consequents:
+                consequent_expanded = ParamGen._expand_vars(consequent, expand_func_opt)
+                if "None" in consequent_expanded:
+                    logger.debug("Consequent includes 'None' value(s), i.e., uninitialized vars. Skipping evaluation...")
+                    return
+                logger.debug("Consequent expanded: {}".format(consequent_expanded))
+                logger.debug("Implication evaluation: {}".format(eval_formula(consequent_expanded)))
+                assert eval_formula(consequent_expanded), implication.errMsg
         else:
             logger.debug("Implication is irrelevant.")
 
