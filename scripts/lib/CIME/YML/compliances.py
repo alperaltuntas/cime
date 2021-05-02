@@ -14,18 +14,21 @@ import re
 import logging
 logger = logging.getLogger(__name__)
 
-# Assertions in config_comply.yaml files are interpreted as implications. For example
-#       expr1:
-#           assert expr2, errMsg
-# is interpreted as (expr1 -> expr2), where expr1 is the antecedent expr2 is the consequent,
-# and errMsg is the message to be printed if the implication evaluates to False.
-Implication = namedtuple('Implication', ['antecedents', 'consequents', 'errMsg', 'variables', 'full_expr'])
+# Compliance expressions in config_comply.yaml files consist of a precondition and an assertion,
+# where precondition is the key and the assertion is the value, e.g.,:
+# precondition:
+#   - assertion_1
+#   - assertion_2
+# where precondition is an arbitrary Python expression that evaluates to a boolean value and
+# assertions are Python assertion expressions. Both the preconditon and the assertion can include
+# literals and expandable parameters.
+Assertion = namedtuple('Assertion', ['preconditions', 'expression', 'errMsg', 'variables'])
 
 class Compliances(ParamGen):
 
     def __init__(self, data_dict, match='last'):
-        self._implications = [] # i.e., relations
-        self._var_impl_idx = {} # mapping from varname to set of implication id's involving var
+        self._assertions = [] # i.e., compliances
+        self._var_assertions_idx = {} # mapping from varname to set of assertions id's involving var
         self._vars_related = {}
 
         ParamGen.__init__(self, data_dict, match)
@@ -53,85 +56,84 @@ class Compliances(ParamGen):
                 .replace('assert','',1).strip()
         return expr, errMsg
 
-    def implications(self, varname=None):
+    def assertions(self, varname=None):
         if varname==None:
-            return self._implications.copy()
+            return self._assertions.copy()
         else:
-            var_implications = []
-            if varname in self._var_impl_idx:
-                var_implications = [self._implications[idx] for idx in self._var_impl_idx[varname]]
-            return var_implications
+            var_assertions = []
+            if varname in self._var_assertions_idx:
+                var_assertions = [self._assertions[idx] for idx in self._var_assertions_idx[varname]]
+            return var_assertions
 
-    def _add_implication(self, antecedents, consequents, errMsg):
-        """adds an implication in the form of antecedents -> consequents."""
-        cond_id = len(self._implications)
-        full_expr = 'not({}) or ({})'.\
-            format( ' and '.join(antecedents),
-                    ' and '.join(consequents))
-        logger.debug("Adding implication: {}".format(full_expr))
-        all_vars = get_expandable_vars(full_expr) # all variables involved in implication
-        consequent_vars = get_expandable_vars(' and '.join(consequents)) # all variables involved in implication
-        self._implications.append(Implication(antecedents, consequents, errMsg, all_vars, full_expr))
-        for var in consequent_vars:
-            if not var in self._var_impl_idx:
-                self._var_impl_idx[var] = set()
+    def _add_assertion(self, preconditions, expression, errMsg):
+        """adds an assertion."""
+        assertion_idx = len(self._assertions)
+        preconditions_joined = ' and '.join(preconditions),
+        logger.debug("Adding assertion: {}: {}".format(preconditions_joined, expression))
+        preconditions_vars = get_expandable_vars(expression) # variables mentioned in preconditions
+        expression_vars = get_expandable_vars(expression) # variables mentioned in assertion
+        all_vars = preconditions_vars | expression_vars
+        self._assertions.append(Assertion(preconditions, expression, errMsg, all_vars))
+        for var in expression_vars:
+            if not var in self._var_assertions_idx:
+                self._var_assertions_idx[var] = set()
                 self._vars_related[var] = set()
-            self._var_impl_idx[var].add(cond_id)
-            for var_other in set(consequent_vars) - {var}:
+            self._var_assertions_idx[var].add(assertion_idx)
+            for var_other in set(expression_vars) - {var}:
                 self._vars_related[var].add(var_other)
 
-    def unfold_implications(self):
-        logger.info("Unfolding all implications...")
-        def _unfold_implications_recursive(data, antecedents=[]):
+    def unfold_compliances(self):
+        logger.info("Unfolding all compliance rules...")
+        def _unfold_compliances_recursive(data, preconditions=[]):
             if isinstance(data, dict):
 
                 for guard, val in data.items():
                     if isinstance(val, list):
                         for item in val:
-                            _unfold_implications_recursive(item, antecedents+[guard])
+                            _unfold_compliances_recursive(item, preconditions+[str(guard)])
                     elif ParamGen._is_guarded_dict(data):
-                        _unfold_implications_recursive(val, antecedents+[guard])
+                        _unfold_compliances_recursive(val, preconditions+[str(guard)])
                     else:
                         raise RuntimeError("Invalid Compliances DPD.")
             elif isinstance(data, str):
-                consequent, errMsg = Compliances._split_assertion_expr(data)
-                self._add_implication(antecedents, [consequent], errMsg)
-        _unfold_implications_recursive(self.data)
+                expression, errMsg = Compliances._split_assertion_expr(data)
+                self._add_assertion(preconditions, expression, errMsg)
+        _unfold_compliances_recursive(self.data)
 
     @staticmethod
-    def check_implication(implication, expand_func, expand_func_opt):
-        logger.debug("Checking implication: {}".format(implication.full_expr))
-        implication_relevant = True
-        for antecedent in implication.antecedents:
-            antecedent_expanded = ParamGen._expand_vars(antecedent, expand_func)
-            if "None" in antecedent_expanded:
-                logger.debug("Antecedent includes 'None' value(s), i.e., uninitialized vars. Skipping evaluation...")
-                implication_relevant = False
+    def check_assertion(assertion, expand_func, expand_func_opt):
+        logger.debug("Checking assertion: {}".format(assertion.expression))
+        assertion_relevant = True
+        for precondition in assertion.preconditions:
+            precondition_expanded = ParamGen._expand_vars(precondition, expand_func)
+            if "None" in precondition_expanded:
+                logger.debug("Assertion precondition includes 'None' value(s), i.e., uninitialized vars. Skipping evaluation...")
+                assertion_relevant = False
                 break
-            antecedent_eval = eval_formula(antecedent_expanded)
-            if antecedent_eval != True:
-                implication_relevant = False
+            precondition_eval = eval_formula(precondition_expanded)
+            if precondition_eval != True:
+                assertion_relevant = False
                 break
-        if implication_relevant:
-            logger.debug("Implication is relevant.")
-            for consequent in implication.consequents:
-                consequent_expanded = ParamGen._expand_vars(consequent, expand_func_opt)
-                if "None" in consequent_expanded:
-                    logger.debug("Consequent includes 'None' value(s), i.e., uninitialized vars. Skipping evaluation...")
-                    return
-                logger.debug("Consequent expanded: {}".format(consequent_expanded))
-                logger.debug("Implication evaluation: {}".format(eval_formula(consequent_expanded)))
-                assert eval_formula(consequent_expanded), implication.errMsg
+        if assertion_relevant:
+            logger.debug("Assertion is relevant.")
+            expression_expanded = ParamGen._expand_vars(assertion.expression, expand_func_opt)
+            if "None" in expression_expanded:
+                logger.debug("Assertion expression includes 'None' value(s), i.e., uninitialized vars. Skipping evaluation...")
+                return
+            logger.debug("Expression expanded: {}".format(expression_expanded))
+            result = eval_formula(expression_expanded)
+            logger.debug("Assertion evaluation: {}".format(result))
+            assert result, assertion.errMsg
         else:
-            logger.debug("Implication is irrelevant.")
+            logger.debug("Assertion is irrelevant.")
 
 
 
     def check_all(self, expand_func):
         assert callable(expand_func), "Must provide expand_func function"
-        logger.info("Checking all implications in Compliances object.")
-        for implication in self._implications:
-            Compliances.check_implication(implication, expand_func)
+        logger.info("Checking all assertions in Compliances object.")
+        for assertion in self._assertions:
+            Compliances.check_assertion(assertion, expand_func)
 
 '''
     def gen_dependency_graph(self):
