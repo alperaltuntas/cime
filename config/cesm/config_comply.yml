@@ -2,13 +2,46 @@
 # the infrastructure and the GUI only. These constraints will not necessarily be
 # included in the final version of this file to be released in a stable version.
 
-# Invariants
-"True":
-    - assert not ($COMP_ATM=="cam" and $COMP_ICE=="sice" and $COMP_LND=="slnd"),    "When CAM is active, either ICE or LND must be non-stub."
-    - assert not ($COMP_OCN=="mom") or $COMP_WAV not in ["ww3", "dwav"],            "MOM6 cannot be coupled with active or data wave components."
-    - assert not ($COMP_OCN=="mom") or $COMP_GLC != "cism",                         "MOM6 cannot be coupled with CISM."
-    - assert not ($COMP_OCN=="mom") or $COMP_LND != "slnd" or $COMP_ICE != "sice",  "LND or ICE must be present to hide MOM6 grid poles."
-    - assert not ($COMP_ATM_PHYS == "CAM60") or $COMP_ICE_OPTION != "CICE4",        "Cannot couple CAM6 and CICE4."
+# SECTION 1: COMPONENT dependencies
+
+# Invariants ------------------------------------------------------------
+
+True:
+    - assert not ($COMP_ICE=="sice") or ($COMP_LND=="slnd" and $COMP_OCN=="socn" and $COMP_ROF=="srof" and $COMP_GLC=="sglc"),
+        "If COMP_ICE is stub, all other components must be stub (except for ATM)"
+    - assert not ($COMP_OCN=="mom") or ($COMP_WAV not in ["dwav"]),
+        "MOM6 cannot be coupled with data wave component."
+    - assert not ($COMP_ATM=="cam") or ($COMP_ICE !="dice"),
+        "CAM cannot be coupled with Data ICE"
+    - assert not ($COMP_WAV=="ww3") or ($COMP_OCN in ['pop', 'mom']),
+        "WW3 can only be selected if either POP2 or MOM6 is the ocean component."
+    - assert not ($COMP_ROF in ['rtm', 'mosart']) or $COMP_LND=="clm",
+        "If running with RTM|MOSART, CLM must be selected as the land component."
+    - assert not ($COMP_OCN in ["pop","mom"] and $COMP_ATM=="datm") or ($COMP_LND=="slnd"),
+        "When MOM|POP is forced with DATM, LND must be stub."
+    - assert not ($COMP_OCN=="mom") or ($COMP_LND != "slnd" or $COMP_ICE != "sice"),
+        "LND or ICE must be present to hide MOM6 grid poles."
+    # Note: we need to divide below assertion into two (as done below). This is because a restriction
+    #       takes affect only after N-1 variables are selected for an assertion with N variables. In this
+    #       assertion (with N=4), waiting for the user to select N-1=3 variables is too late. For instance,
+    #       if user select COMP_ATM and COMP_LND, COMP_ICE and COMP_OCN is still not restricted to be
+    #       set to stub, because, one of them must also be selected. If we divide the below assertion into
+    #       two assertions with 3 variables, however, setting COMP_ATM and COMP_LND is sufficient to
+    #       restrict both COMP_ICE and COMP_OCN
+    #- assert not ($COMP_ATM=="datm" and $COMP_LND=="clm" ) or ($COMP_ICE=="sice" and $COMP_OCN=="socn"),
+    #    "If CLM is coupled with DATM, then both ICE and OCN must be stub"
+    - assert not ($COMP_ATM=="datm" and $COMP_LND=="clm" ) or ($COMP_ICE=="sice"),
+        "If CLM is coupled with DATM, then ICE must be stub"
+    - assert not ($COMP_ATM=="datm" and $COMP_LND=="clm" ) or ($COMP_OCN=="socn"),
+        "If CLM is coupled with DATM, then OCN must be stub"
+
+# Preconditioned assertions ---------------------------------------------
+
+$COMP_ATM=="datm" and $COMP_LND=="clm":
+    assert $COMP_ICE!="sice" and $COMP_OCN=="socn", "If CLM is coupled with DATM, then both ICE and OCN must be stub"
+
+$COMP_ICE=="cice" and $COMP_OCN == "docn":
+    assert $COMP_OCN_OPTION=="SOM", "When DOCN is coupled with CICE, DOCN option must be set to SOM."
 
 $COMP_ICE == 'dice':
     assert $COMP_ICE_OPTION != "(none)", "Must pick a valid DICE option."
