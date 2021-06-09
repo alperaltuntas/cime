@@ -20,3 +20,6 @@ scripts/Tools/JENKINS*
 
 #Ignore nuopc driver available seperatly
 src/drivers/nuopc
+
+#Ignore visualCIME, which is an external
+scripts/visualCIME
