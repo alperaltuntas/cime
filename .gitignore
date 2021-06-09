@@ -23,3 +23,6 @@ src/drivers/nuopc
 
 #Ignore visualCIME, which is an external
 scripts/visualCIME
+
+# Ignore jupyter notebook checkpoints
+.ipynb_checkpoints/
