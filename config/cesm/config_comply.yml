@@ -58,6 +58,14 @@ $COMP_LND == 'clm' and $COMP_OCN == 'pop' and ('BGC' in $COMP_LND_OPTION or 'ECO
 $COMP_ATM == 'datm' and $COMP_ROF == 'drof' and ($COMP_ROF_OPTION == 'JRA' or $COMP_ATM_OPTION == 'JRA'):
     assert ($COMP_ROF_OPTION == 'JRA') == ($COMP_ATM_OPTION == 'JRA'), "IF DROF is set to be JRA, then DATM must be too."
 
+# Grids ---------------------------------------------
+
+$COMP_ATM=="cam":
+    assert "SCAM" in $COMP_ATM_PHYS or $ATM_GRID != "T42", "T42 grid can only be used with SCAM option."
+
+$COMP_OCN=="mom":
+    assert $OCN_GRID in ["tx0.66v1", "gx1v6", "tx0.25v1"], "Not a valid MOM6 grid."
+
 ### Safety rules to be checked:
 # (1) Each option must eventually be eligible.
 # (2) At least one option of a particular eligible variable must be eligible at any time.
