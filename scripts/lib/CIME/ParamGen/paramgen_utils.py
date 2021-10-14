@@ -4,7 +4,6 @@ from __future__ import print_function
 from collections import OrderedDict
 import os
 import re
-import ast
 
 def is_number(var):
     """
