@@ -68,6 +68,7 @@
         <xs:element ref="grid" maxOccurs="unbounded"/>
         <xs:element ref="support" minOccurs="0"/>
         <xs:element ref="mask" minOccurs="0"/>
+        <xs:element ref="desc" minOccurs="0"/>
       </xs:sequence>
       <xs:attribute ref="alias" use="required"/>
       <xs:attribute ref="compset"/>
