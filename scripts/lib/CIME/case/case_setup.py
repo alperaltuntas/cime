@@ -3,15 +3,18 @@ Library for case.setup.
 case_setup is a member of class Case from file case.py
 """
 
+import errno
+
 from CIME.XML.standard_module_setup import *
 
 from CIME.XML.machines      import Machines
 from CIME.BuildTools.configure import configure
-from CIME.utils             import get_cime_root, run_and_log_case_status, get_model, get_batch_script_for_job, safe_copy
+from CIME.utils             import run_and_log_case_status, get_model, \
+    get_batch_script_for_job, safe_copy, file_contains_python_function, import_from_file
 from CIME.utils             import batch_jobid
+from CIME.utils             import transform_vars
 from CIME.test_status       import *
 from CIME.locked_files      import unlock_file, lock_file
-import errno
 
 logger = logging.getLogger(__name__)
 
@@ -49,24 +52,65 @@ def _build_usernl_files(case, model, comp):
             ninst = case.get_value("NINST")
         elif ninst == 1:
             ninst = case.get_value("NINST_{}".format(model))
-        nlfile = "user_nl_{}".format(comp)
-        model_nl = os.path.join(model_dir, nlfile)
-        if ninst > 1:
-            for inst_counter in range(1, ninst+1):
-                inst_nlfile = "{}_{:04d}".format(nlfile, inst_counter)
-                if not os.path.exists(inst_nlfile):
-                    # If there is a user_nl_foo in the case directory, copy it
-                    # to user_nl_foo_INST; otherwise, copy the original
-                    # user_nl_foo from model_dir
-                    if os.path.exists(nlfile):
-                        safe_copy(nlfile, inst_nlfile)
+        default_nlfile = "user_nl_{}".format(comp)
+        model_nl = os.path.join(model_dir, default_nlfile)
+        user_nl_list = _get_user_nl_list(case, default_nlfile, model_dir)
+
+        # Note that, even if there are multiple elements of user_nl_list (i.e., we are
+        # creating multiple user_nl files for this component with different names), all of
+        # them will start out as copies of the single user_nl_comp file in the model's
+        # source tree - unless the file has _stream in its name 
+        for nlfile in user_nl_list:
+            if ninst > 1:
+                for inst_counter in range(1, ninst+1):
+                    inst_nlfile = "{}_{:04d}".format(nlfile, inst_counter)
+                    if not os.path.exists(inst_nlfile):
+                        # If there is a user_nl_foo in the case directory, copy it
+                        # to user_nl_foo_INST; otherwise, copy the original
+                        # user_nl_foo from model_dir
+                        if os.path.exists(nlfile):
+                            safe_copy(nlfile, inst_nlfile)
+                        elif "_stream" in nlfile:
+                            safe_copy(os.path.join(model_dir, nlfile), inst_nlfile)
+                        elif os.path.exists(model_nl):
+                            safe_copy(model_nl, inst_nlfile)
+            else:
+                # ninst = 1
+                if not os.path.exists(nlfile):
+                    if "_stream" in nlfile:
+                        safe_copy(os.path.join(model_dir, nlfile), nlfile)
                     elif os.path.exists(model_nl):
-                        safe_copy(model_nl, inst_nlfile)
-        else:
-            # ninst = 1
-            if not os.path.exists(nlfile):
-                if os.path.exists(model_nl):
-                    safe_copy(model_nl, nlfile)
+                        safe_copy(model_nl, nlfile)
+
+###############################################################################
+def _get_user_nl_list(case, default_nlfile, model_dir):
+    """Get a list of user_nl files needed by this component
+
+    Typically, each component has a single user_nl file: user_nl_comp. However, some
+    components use multiple user_nl files. These components can define a function in
+    cime_config/buildnml named get_user_nl_list, which returns a list of user_nl files
+    that need to be staged in the case directory. For example, in a run where CISM is
+    modeling both Antarctica and Greenland, its get_user_nl_list function will return
+    ['user_nl_cism', 'user_nl_cism_ais', 'user_nl_cism_gris'].
+
+    If that function is NOT defined in the component's buildnml, then we return the given
+    default_nlfile.
+
+    """
+    # Check if buildnml is present in the expected location, and if so, whether it
+    # contains the function "get_user_nl_list"; if so, we'll import the module and call
+    # that function; if not, we'll fall back on the default value.
+    buildnml_path = os.path.join(model_dir, "buildnml")
+    has_function = False
+    if (os.path.isfile(buildnml_path) and
+        file_contains_python_function(buildnml_path, "get_user_nl_list")):
+        has_function = True
+
+    if has_function:
+        comp_buildnml = import_from_file("comp_buildnml", buildnml_path)
+        return comp_buildnml.get_user_nl_list(case)
+    else:
+        return [default_nlfile]
 
 ###############################################################################
 def _case_setup_impl(case, caseroot, clean=False, test_mode=False, reset=False, keep=None):
@@ -96,7 +140,7 @@ def _case_setup_impl(case, caseroot, clean=False, test_mode=False, reset=False, 
             except OSError as e:
                 if e.errno == errno.EACCES:
                     logger.info("Invalid permissions to create {}".format(din_loc_root))
-            
+
         expect(not (not os.path.isdir(din_loc_root) and testcase != "SBN"),
                "inputdata root is not a directory or is not readable: {}".format(din_loc_root))
 
@@ -277,7 +321,7 @@ def case_setup(self, clean=False, test_mode=False, reset=False, keep=None):
         test_name = casebaseid if casebaseid is not None else self.get_value("CASE")
         with TestStatus(test_dir=caseroot, test_name=test_name) as ts:
             try:
-                run_and_log_case_status(functor, phase, 
+                run_and_log_case_status(functor, phase,
                                         custom_starting_msg_functor=msg_func,
                                         custom_success_msg_functor=msg_func,
                                         caseroot=caseroot,
@@ -291,8 +335,32 @@ def case_setup(self, clean=False, test_mode=False, reset=False, keep=None):
                 else:
                     ts.set_status(SETUP_PHASE, TEST_PASS_STATUS)
     else:
-        run_and_log_case_status(functor, phase, 
+        run_and_log_case_status(functor, phase,
                                 custom_starting_msg_functor=msg_func,
                                 custom_success_msg_functor=msg_func,
                                 caseroot=caseroot,
                                 is_batch=is_batch)
+
+    # put the following section here to make sure the rundir is generated first
+    machdir = self.get_value("MACHDIR")
+    mach = self.get_value("MACH")
+    ngpus_per_node = self.get_value("NGPUS_PER_NODE")
+    overrides = {}
+    overrides["ngpus_per_node"] = ngpus_per_node
+    input_template = os.path.join(machdir,"mpi_run_gpu.{}".format(mach))
+    if os.path.isfile(input_template):
+        # update the wrapper script that sets the device id for each MPI rank
+        output_text = transform_vars(open(input_template,"r").read(), case=self, overrides=overrides)
+
+        # write it out to the run dir
+        rundir = self.get_value("RUNDIR")
+        output_name = os.path.join(rundir,"set_device_rank.sh")
+        logger.info("Creating file {}".format(output_name))
+        with open(output_name, "w") as f:
+            f.write(output_text)
+
+        # make the wrapper script executable
+        if os.path.isfile(output_name):
+            os.system("chmod +x "+output_name)
+        else:
+            expect(False, "The file {} is not written out correctly.".format(output_name))

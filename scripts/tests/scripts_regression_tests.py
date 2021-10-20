@@ -22,7 +22,9 @@ import stat as osstat
 
 import collections
 
-from CIME.utils import run_cmd, run_cmd_no_fail, get_lids, get_current_commit, safe_copy, CIMEError, get_cime_root, Timeout
+from CIME.utils import run_cmd, run_cmd_no_fail, get_lids, get_current_commit, \
+    safe_copy, CIMEError, get_cime_root, get_src_root, Timeout, \
+    import_from_file, get_model
 import get_tests
 import CIME.test_scheduler, CIME.wait_for_tests
 from  CIME.test_scheduler import TestScheduler
@@ -123,12 +125,13 @@ class A_RunUnitTests(unittest.TestCase):
         # (i.e., tests defined using python's unittest module).
         #
         # This is analogous to running:
-        #     python -m unittest discover -s CIME/tests -t .
+        #     python3 -m unittest discover -s CIME/tests -t .
         # from cime/scripts/lib
         #
         # Yes, that means we have a bunch of unit tests run from this one unit
         # test.
 
+        before_model = get_model()
         testsuite = unittest.defaultTestLoader.discover(
             start_dir = os.path.join(LIB_DIR,"CIME","tests"),
             pattern = 'test*.py',
@@ -146,6 +149,7 @@ class A_RunUnitTests(unittest.TestCase):
             logging.getLogger().setLevel(log_lvl)
 
         self.assertTrue(results.wasSuccessful())
+        self.assertEqual(get_model(), before_model)
 
     def test_lib_doctests(self):
         # Find and run all the doctests in the lib directory tree
@@ -158,7 +162,7 @@ class A_RunUnitTests(unittest.TestCase):
                         content = fd.read()
                     if '>>>' in content:
                         print("Running doctests for {}".format(filepath))
-                        run_cmd_assert_result(self, 'PYTHONPATH={}:$PYTHONPATH python -m doctest {} 2>&1'.format(LIB_DIR, filepath), from_dir=LIB_DIR)
+                        run_cmd_assert_result(self, 'PYTHONPATH={}:$PYTHONPATH python3 -m doctest {} 2>&1'.format(LIB_DIR, filepath), from_dir=LIB_DIR)
                     else:
                         print("{} has no doctests".format(filepath))
 
@@ -172,7 +176,7 @@ class C_TestGridGeneration(unittest.TestCase):
         cls._testdirs = []
 
     def test_gen_domain(self):
-        if CIME.utils.get_model() != "e3sm":
+        if get_model() != "e3sm":
             self.skipTest("Skipping gen_domain test. Depends on E3SM tools")
         cime_root = get_cime_root()
         inputdata = MACHINE.get_value("DIN_LOC_ROOT")
@@ -244,7 +248,7 @@ def kill_python_subprocesses(sig=signal.SIGKILL, expected_num_killed=None, teste
 def assert_dashboard_has_build(tester, build_name, expected_count=1):
 ###########################################################################
     # Do not test E3SM dashboard if model is CESM
-    if CIME.utils.get_model() == "e3sm":
+    if get_model() == "e3sm":
         time.sleep(10) # Give chance for cdash to update
 
         wget_file = tempfile.mktemp()
@@ -360,7 +364,8 @@ class J_TestCreateNewcase(unittest.TestCase):
         testdir = os.path.join(cls._testroot, 'testcreatenewcase')
         if os.path.exists(testdir):
             shutil.rmtree(testdir)
-        args =  " --case %s --compset X --output-root %s --handle-preexisting-dirs=r " % (testdir, cls._testroot)
+        args = " --case %s --compset X --output-root %s --handle-preexisting-dirs=r" % (testdir, cls._testroot)
+        args += " --run-unsupported"
         if TEST_COMPILER is not None:
             args = args +  " --compiler %s"%TEST_COMPILER
         if TEST_MPILIB is not None:
@@ -450,6 +455,7 @@ class J_TestCreateNewcase(unittest.TestCase):
 
         user_mods_dir = os.path.join(CIME.utils.get_python_libs_root(), "..", "tests", "user_mods_test1")
         args = " --case %s --compset X --user-mods-dir %s --output-root %s --handle-preexisting-dirs=r"% (testdir, user_mods_dir, cls._testroot)
+        args += " --run-unsupported"
         if TEST_COMPILER is not None:
             args = args + " --compiler %s"%TEST_COMPILER
         if TEST_MPILIB is not None:
@@ -585,16 +591,16 @@ class J_TestCreateNewcase(unittest.TestCase):
 
         cls._testdirs.append(testdir)
 
-        if CIME.utils.get_model() == "cesm":
-            # Will need to be updated when cesm brings in new share repo new line will be.
-            # pesfile = os.path.join(get_src_root(),"cpl7","driver","cime_config","config_pes.xml")
-            # or
-            # pesfile = os.path.join(get_src_root(),"components","cmeps","cime_config","config_pes.xml")
-            pesfile = os.path.join("..","src","drivers",CIME.utils.get_cime_default_driver(),"cime_config","config_pes.xml")
+        if get_model() == "cesm":
+            if CIME.utils.get_cime_default_driver() == "nuopc":
+                pesfile = os.path.join(get_src_root(),"components","cmeps","cime_config","config_pes.xml")
+            else:
+                pesfile = os.path.join(get_src_root(),"components","cpl7","driver","cime_config","config_pes.xml")
         else:
-            pesfile = os.path.join("..","src","drivers",CIME.utils.get_cime_default_driver(),"cime_config","config_pes.xml")
+            pesfile = os.path.join(get_src_root(),"driver-mct","cime_config","config_pes.xml")
+
         args =  "--case %s --compset 2000_SATM_XLND_SICE_SOCN_XROF_XGLC_SWAV  --pesfile %s --res f19_g16 --output-root %s --handle-preexisting-dirs=r" % (testdir, pesfile, cls._testroot)
-        if CIME.utils.get_model() == "cesm":
+        if get_model() == "cesm":
             args += " --run-unsupported"
         if TEST_COMPILER is not None:
             args += " --compiler %s"%TEST_COMPILER
@@ -618,7 +624,7 @@ class J_TestCreateNewcase(unittest.TestCase):
 
         pesfile = os.path.join(previous_testdir,"env_mach_pes.xml")
         args =  "--case %s --compset 2000_SATM_XLND_SICE_SOCN_XROF_XGLC_SWAV --pesfile %s --res f19_g16 --output-root %s --handle-preexisting-dirs=r" % (testdir, pesfile, cls._testroot)
-        if CIME.utils.get_model() == "cesm":
+        if get_model() == "cesm":
             args += " --run-unsupported"
         if TEST_COMPILER is not None:
             args += " --compiler %s"%TEST_COMPILER
@@ -643,6 +649,7 @@ class J_TestCreateNewcase(unittest.TestCase):
 
         cls._testdirs.append(testdir)
         args = " --case CreateNewcaseTest --script-root %s --compset X --output-root %s --handle-preexisting-dirs u" % (testdir, cls._testroot)
+        args += " --run-unsupported"
         if TEST_COMPILER is not None:
             args += " --compiler %s"%TEST_COMPILER
         if TEST_MPILIB is not None:
@@ -719,7 +726,7 @@ class J_TestCreateNewcase(unittest.TestCase):
             args += " --res f19_g17 "
         else:
             args += " --res f19_g16 "
-        if CIME.utils.get_model() == "cesm":
+        if get_model() == "cesm":
             args += " --run-unsupported"
         if TEST_COMPILER is not None:
             args += " --compiler %s"%TEST_COMPILER
@@ -753,7 +760,7 @@ class J_TestCreateNewcase(unittest.TestCase):
             args += " --res f19_g17 "
         else:
             args += " --res f19_g16 "
-        if CIME.utils.get_model() == "cesm":
+        if get_model() == "cesm":
             args += " --run-unsupported"
         if TEST_COMPILER is not None:
             args += " --compiler %s"%TEST_COMPILER
@@ -830,7 +837,8 @@ class J_TestCreateNewcase(unittest.TestCase):
         # config_machines_template.xml
         args = (" --case {testdir} --compset X --mach mymachine"
                 " --output-root {testroot} --non-local"
-                " --extra-machines-dir {extra_machines_dir}".format(
+                " --extra-machines-dir {extra_machines_dir}"
+                " --run-unsupported".format(
                     testdir=testdir, testroot=cls._testroot,
                     extra_machines_dir=extra_machines_dir))
         if CIME.utils.get_cime_default_driver() == "nuopc":
@@ -856,7 +864,7 @@ class J_TestCreateNewcase(unittest.TestCase):
     def test_m_createnewcase_alternate_drivers(self):
         # Test that case.setup runs for nuopc and moab drivers
         cls = self.__class__
-        model = CIME.utils.get_model()
+        model = get_model()
         for driver in ("nuopc", "moab"):
             if not os.path.exists(os.path.join(get_cime_root(),"src","drivers",driver)):
                 self.skipTest("Skipping driver test for {}, driver not found".format(driver))
@@ -889,7 +897,7 @@ class J_TestCreateNewcase(unittest.TestCase):
 
     def test_n_createnewcase_bad_compset(self):
         cls = self.__class__
-        model = CIME.utils.get_model()
+        model = get_model()
 
         testdir = os.path.join(cls._testroot, 'testcreatenewcase_bad_compset')
         if os.path.exists(testdir):
@@ -994,7 +1002,7 @@ class M_TestWaitForTests(unittest.TestCase):
     def simple_test(self, testdir, expected_results, extra_args="", build_name=None):
     ###########################################################################
         # Need these flags to test dashboard if e3sm
-        if CIME.utils.get_model() == "e3sm" and build_name is not None:
+        if get_model() == "e3sm" and build_name is not None:
             extra_args += " -b %s" % build_name
 
         expected_stat = 0
@@ -1144,7 +1152,7 @@ class M_TestWaitForTests(unittest.TestCase):
 
         assert_dashboard_has_build(self, build_name)
 
-        if CIME.utils.get_model() == "e3sm":
+        if get_model() == "e3sm":
             cdash_result_dir = os.path.join(self._testdir_unfinished, "Testing")
             tag_file         = os.path.join(cdash_result_dir, "TAG")
             self.assertTrue(os.path.isdir(cdash_result_dir))
@@ -1561,7 +1569,7 @@ class P_TestJenkinsGenericJob(TestCreateTestCommon):
     ###########################################################################
     def setUp(self):
     ###########################################################################
-        if CIME.utils.get_model() != "e3sm":
+        if get_model() != "e3sm":
             self.skipTest("Skipping Jenkins tests. E3SM feature")
         TestCreateTestCommon.setUp(self)
 
@@ -1588,7 +1596,7 @@ class P_TestJenkinsGenericJob(TestCreateTestCommon):
             extra_args += " --no-batch"
 
         # Need these flags to test dashboard if e3sm
-        if CIME.utils.get_model() == "e3sm" and build_name is not None:
+        if get_model() == "e3sm" and build_name is not None:
             extra_args += " -p ACME_test --submit-to-cdash --cdash-build-group=Nightly -c %s" % build_name
 
         run_cmd_assert_result(self, "%s/jenkins_generic_job -r %s %s -B %s" % (TOOLS_DIR, self._testdir, extra_args, self._baseline_area),
@@ -1636,7 +1644,7 @@ class P_TestJenkinsGenericJob(TestCreateTestCommon):
     def test_jenkins_generic_job_kill(self):
     ###########################################################################
         build_name = "jenkins_generic_job_kill_%s" % CIME.utils.get_timestamp()
-        run_thread = threading.Thread(target=self.threaded_test, args=(False, " -t cime_test_only_slow_pass -b master --baseline-compare=no", build_name))
+        run_thread = threading.Thread(target=self.threaded_test, args=(False, " -t cime_test_only_slow_pass -b master", build_name))
         run_thread.daemon = True
         run_thread.start()
 
@@ -1782,7 +1790,7 @@ class Q_TestBlessTestResults(TestCreateTestCommon):
 
         # Generate some baselines
         for test_name in test_names:
-            if CIME.utils.get_model() == "e3sm":
+            if get_model() == "e3sm":
                 genargs = ["-g", "-o", "-b", self._baseline_name, test_name]
                 compargs = ["-c", "-b", self._baseline_name, test_name]
             else:
@@ -1827,7 +1835,7 @@ class Q_TestBlessTestResults(TestCreateTestCommon):
         if (NO_FORTRAN_RUN):
             self.skipTest("Skipping fortran test")
         test_to_change = "TESTRUNPASS_P1.f19_g16_rx1.A"
-        if CIME.utils.get_model() == "e3sm":
+        if get_model() == "e3sm":
             genargs = ["-g", "-o", "-b", self._baseline_name, "cime_test_only_pass"]
             compargs = ["-c", "-b", self._baseline_name, "cime_test_only_pass"]
         else:
@@ -2226,7 +2234,7 @@ class K_TestCimeCase(TestCreateTestCommon):
     ###########################################################################
     def test_cime_case_test_walltime_mgmt_1(self):
     ###########################################################################
-        if CIME.utils.get_model() != "e3sm":
+        if get_model() != "e3sm":
             self.skipTest("Skipping walltime test. Depends on E3SM batch settings")
 
         test_name = "ERS.f19_g16_rx1.A"
@@ -2242,7 +2250,7 @@ class K_TestCimeCase(TestCreateTestCommon):
     ###########################################################################
     def test_cime_case_test_walltime_mgmt_2(self):
     ###########################################################################
-        if CIME.utils.get_model() != "e3sm":
+        if get_model() != "e3sm":
             self.skipTest("Skipping walltime test. Depends on E3SM batch settings")
 
         test_name = "ERS_P64.f19_g16_rx1.A"
@@ -2258,7 +2266,7 @@ class K_TestCimeCase(TestCreateTestCommon):
     ###########################################################################
     def test_cime_case_test_walltime_mgmt_3(self):
     ###########################################################################
-        if CIME.utils.get_model() != "e3sm":
+        if get_model() != "e3sm":
             self.skipTest("Skipping walltime test. Depends on E3SM batch settings")
 
         test_name = "ERS_P64.f19_g16_rx1.A"
@@ -2274,7 +2282,7 @@ class K_TestCimeCase(TestCreateTestCommon):
     ###########################################################################
     def test_cime_case_test_walltime_mgmt_4(self):
     ###########################################################################
-        if CIME.utils.get_model() != "e3sm":
+        if get_model() != "e3sm":
             self.skipTest("Skipping walltime test. Depends on E3SM batch settings")
 
         test_name = "ERS_P1.f19_g16_rx1.A"
@@ -2290,7 +2298,7 @@ class K_TestCimeCase(TestCreateTestCommon):
     ###########################################################################
     def test_cime_case_test_walltime_mgmt_5(self):
     ###########################################################################
-        if CIME.utils.get_model() != "e3sm":
+        if get_model() != "e3sm":
             self.skipTest("Skipping walltime test. Depends on E3SM batch settings")
 
         test_name = "ERS_P1.f19_g16_rx1.A"
@@ -2354,7 +2362,7 @@ class K_TestCimeCase(TestCreateTestCommon):
     ###########################################################################
     def test_cime_case_test_walltime_mgmt_8(self):
     ###########################################################################
-        if CIME.utils.get_model() != "e3sm":
+        if get_model() != "e3sm":
             self.skipTest("Skipping walltime test. Depends on E3SM batch settings")
 
         test_name = "SMS_P25600.f19_g16_rx1.A"
@@ -2373,7 +2381,7 @@ class K_TestCimeCase(TestCreateTestCommon):
     ###########################################################################
         test_name = "ERS_P1.f19_g16_rx1.A"
         # have to use a machine both models know and one that doesn't put PROJECT in any key paths
-        if CIME.utils.get_model() == "e3sm":
+        if get_model() == "e3sm":
             machine = "mappy"
         else:
             machine = "melvin"
@@ -2431,19 +2439,16 @@ class K_TestCimeCase(TestCreateTestCommon):
     ###########################################################################
     def test_case_submit_interface(self):
     ###########################################################################
-        try:
-            import imp
-        except ImportError:
-            print("imp not found, skipping case.submit interface test")
-            return
         # the current directory may not exist, so make sure we are in a real directory
         os.chdir(os.getenv("HOME"))
         sys.path.append(TOOLS_DIR)
         case_submit_path = os.path.join(TOOLS_DIR, "case.submit")
-        submit_interface = imp.load_source("case_submit_interface", case_submit_path)
+
+        module = import_from_file("case.submit", case_submit_path)
+
         sys.argv = ["case.submit", "--batch-args", "'random_arguments_here.%j'",
                     "--mail-type", "fail", "--mail-user", "'random_arguments_here.%j'"]
-        submit_interface._main_func(None, True)
+        module._main_func(None, True)
 
     ###########################################################################
     def test_xml_caching(self):
@@ -2530,8 +2535,10 @@ class K_TestCimeCase(TestCreateTestCommon):
     ###########################################################################
     def test_self_build_cprnc(self):
     ###########################################################################
-        if (NO_FORTRAN_RUN):
+        if NO_FORTRAN_RUN:
             self.skipTest("Skipping fortran test")
+        if TEST_COMPILER and "gpu" in TEST_COMPILER:
+            self.skipTest("Skipping cprnc test for gpu compiler")
 
         testname = "ERS_Ln7.f19_g16_rx1.A"
         casedir = self._create_test([testname, "--no-build"], test_id=self._baseline_name)
@@ -2563,7 +2570,7 @@ class X_TestSingleSubmit(TestCreateTestCommon):
         # Skip unless on a batch system and users did not select no-batch
         if (not self._hasbatch):
             self.skipTest("Skipping single submit. Not valid without batch")
-        if CIME.utils.get_model() != "e3sm":
+        if get_model() != "e3sm":
             self.skipTest("Skipping single submit. E3SM experimental feature")
         if self._machine not in ["sandiatoss3"]:
             self.skipTest("Skipping single submit. Only works on sandiatoss3")
@@ -2621,7 +2628,7 @@ class L_TestSaveTimings(TestCreateTestCommon):
 
         if manual_timing:
             run_cmd_assert_result(self, "cd %s && %s/save_provenance postrun" % (casedir, TOOLS_DIR))
-        if CIME.utils.get_model() == "e3sm":
+        if get_model() == "e3sm":
             provenance_glob = os.path.join(timing_dir, "performance_archive", getpass.getuser(), casename, lids[0] + "*")
             provenance_dirs = glob.glob(provenance_glob)
             self.assertEqual(len(provenance_dirs), 1, msg="wrong number of provenance dirs, expected 1, got {}, looked for {}".format(provenance_dirs, provenance_glob))
@@ -2651,7 +2658,7 @@ class L_TestSaveTimings(TestCreateTestCommon):
     ###########################################################################
     def test_success_recording(self):
     ###########################################################################
-        if CIME.utils.get_model() != "e3sm":
+        if get_model() != "e3sm":
             self.skipTest("Skipping success recording tests. E3SM feature")
 
         fake_test1 = "faketest1"
@@ -3448,7 +3455,7 @@ class S_TestManageAndQuery(unittest.TestCase):
     """Tests various scripts to manage and query xml files"""
 
     def setUp(self):
-        if CIME.utils.get_model() == "e3sm":
+        if get_model() == "e3sm":
             self.skipTest("Skipping XML test management tests. E3SM does not use this.")
 
     def _run_and_assert_query_testlist(self, extra_args=""):
@@ -3515,7 +3522,7 @@ def check_for_pylint():
 def write_provenance_info():
     curr_commit = get_current_commit(repo=LIB_DIR)
     logging.info("\nTesting commit %s" % curr_commit)
-    cime_model = CIME.utils.get_model()
+    cime_model = get_model()
     logging.info("Using cime_model = %s" % cime_model)
     logging.info("Testing machine = %s" % MACHINE.get_machine_name())
     if TEST_COMPILER is not None:

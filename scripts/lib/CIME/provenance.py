@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
 Library for saving build/run provenance.
@@ -60,6 +60,38 @@ def _run_git_cmd_recursively(cmd, srcroot, output):
         fd.write((output1 if rc1 == 0 else err1) + "\n\n")
         fd.write((output2 if rc2 == 0 else err2) + "\n")
 
+def _parse_dot_git_path(srcroot):
+    dot_git_pattern = r"^(.*/\.git).*"
+
+    m = re.match(dot_git_pattern, srcroot)
+
+    expect(m is not None, f"Could not parse git path from {srcroot!r}")
+
+    return m.group(1)
+
+def _find_git_root(srcroot):
+    gitroot = f"{srcroot}/.git"
+
+    expect(os.path.exists(gitroot),
+           f"{srcroot!r} is not a git repository, failed to collect provenance")
+
+    # Handle normal git repositories
+    if os.path.isdir(gitroot):
+        return gitroot
+
+    # Handle git worktrees
+    with open(gitroot) as fd:
+        line = fd.readline()
+
+    gitdir_pattern = r"^gitdir:\s?(.*)$"
+
+    m = re.match(gitdir_pattern, line)
+
+    expect(m is not None, f"Could not determine git root in {srcroot!r}")
+
+    # First group is the actual gitroot
+    return m.group(1)
+
 def _record_git_provenance(srcroot, exeroot, lid):
     """ Records git provenance
 
@@ -82,8 +114,11 @@ def _record_git_provenance(srcroot, exeroot, lid):
     remote_prov = os.path.join(exeroot, "GIT_REMOTE.{}".format(lid))
     _run_git_cmd_recursively("remote -v", srcroot, remote_prov)
 
+    gitroot = _find_git_root(srcroot)
+    gitroot = _parse_dot_git_path(gitroot)
+
     # Git config
-    config_src = os.path.join(srcroot, ".git", "config")
+    config_src = os.path.join(gitroot, "config")
     config_prov = os.path.join(exeroot, "GIT_CONFIG.{}".format(lid))
     safe_copy(config_src, config_prov, preserve_meta=False)
 
@@ -98,8 +133,10 @@ def _save_build_provenance_e3sm(case, lid):
     with open(describe_prov, "w") as fd:
         fd.write(desc)
 
+    gitroot = _find_git_root(srcroot)
+
     # Save HEAD
-    headfile = os.path.join(srcroot, ".git", "logs", "HEAD")
+    headfile = os.path.join(gitroot, "logs", "HEAD")
     headfile_prov = os.path.join(exeroot, "GIT_LOGS_HEAD.{}".format(lid))
     if os.path.exists(headfile_prov):
         os.remove(headfile_prov)
@@ -342,6 +379,23 @@ def _save_prerun_provenance_e3sm(case, lid):
 def _save_prerun_provenance_cesm(case, lid): # pylint: disable=unused-argument
     pass
 
+def _save_prerun_provenance_common(case, lid):
+    """ Saves common prerun provenance.
+    """
+    run_dir = case.get_value("RUNDIR")
+
+    base_preview_run = os.path.join(run_dir, "preview_run.log")
+    preview_run = f"{base_preview_run}.{lid}"
+
+    if os.path.exists(base_preview_run):
+        os.remove(base_preview_run)
+
+    with open(base_preview_run, "w") as fd:
+        case.preview_run(lambda x: fd.write("{}\n".format(x)), None)
+
+        # Create copy rather than symlink, the log is automatically gzipped
+        safe_copy(base_preview_run, preview_run)
+
 def save_prerun_provenance(case, lid=None):
     with SharedArea():
         # Always save env
@@ -351,6 +405,8 @@ def save_prerun_provenance(case, lid=None):
         if not os.path.isdir(logdir):
             os.makedirs(logdir)
         env_module.save_all_env_info(os.path.join(logdir, "run_environment.txt.{}".format(lid)))
+
+        _save_prerun_provenance_common(case, lid)
 
         model = case.get_value("MODEL")
         if model == "e3sm":
@@ -462,6 +518,13 @@ def _save_postrun_timing_e3sm(case, lid):
     globs_to_copy.append("timing/*.{}*".format(lid))
     globs_to_copy.append("CaseStatus")
     globs_to_copy.append(os.path.join(rundir, "spio_stats.{}.tar.gz".format(lid)))
+    globs_to_copy.append(os.path.join(caseroot, "replay.sh"))
+    # Can't use a single glob, similar files e.g. {filename}.{lid} get picked up.
+    bld_filenames = ["GIT_STATUS", "GIT_DIFF", "GIT_LOG", "GIT_REMOTE",
+                     "GIT_CONFIG", "GIT_SUBMODULE_STATUS"]
+    bld_globs = map(lambda x: f"bld/{x}", bld_filenames)
+    globs_to_copy.extend(bld_globs)
+    globs_to_copy.append("run/preview_run.log")
 
     for glob_to_copy in globs_to_copy:
         for item in glob.glob(os.path.join(caseroot, glob_to_copy)):

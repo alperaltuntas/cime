@@ -15,7 +15,7 @@ from CIME.XML.standard_module_setup import *
 import six
 from get_tests import get_recommended_test_time, get_build_groups
 from CIME.utils import append_status, append_testlog, TESTS_FAILED_ERR_CODE, parse_test_name, get_full_test_name, get_model, \
-    convert_to_seconds, get_cime_root, get_project, get_timestamp, get_python_libs_root
+    convert_to_seconds, get_cime_root, get_project, get_timestamp, get_python_libs_root, get_cime_default_driver
 from CIME.test_status import *
 from CIME.XML.machines import Machines
 from CIME.XML.generic_xml import GenericXML
@@ -45,7 +45,7 @@ def _translate_test_names_for_new_pecount(test_names, force_procs, force_threads
     new_test_names = []
     caseopts = []
     for test_name in test_names:
-        testcase, caseopts, grid, compset, machine, compiler, testmod = parse_test_name(test_name)
+        testcase, caseopts, grid, compset, machine, compiler, testmods = parse_test_name(test_name)
         rewrote_caseopt = False
         if caseopts is not None:
             for idx, caseopt in enumerate(caseopts):
@@ -73,7 +73,7 @@ def _translate_test_names_for_new_pecount(test_names, force_procs, force_threads
             else:
                 caseopts.append(newcaseopt)
 
-        new_test_name = get_full_test_name(testcase, caseopts=caseopts, grid=grid, compset=compset, machine=machine, compiler=compiler, testmod=testmod)
+        new_test_name = get_full_test_name(testcase, caseopts=caseopts, grid=grid, compset=compset, machine=machine, compiler=compiler, testmods_list=testmods)
         new_test_names.append(new_test_name)
 
     return new_test_names
@@ -123,11 +123,11 @@ class TestScheduler(object):
                  allow_baseline_overwrite=False, output_root=None,
                  force_procs=None, force_threads=None, mpilib=None,
                  input_dir=None, pesfile=None, mail_user=None, mail_type=None, allow_pnl=False,
-                 non_local=False, single_exe=False, workflow=None):
+                 non_local=False, single_exe=False, workflow=None, chksum=False):
     ###########################################################################
         self._cime_root       = get_cime_root()
         self._cime_model      = get_model()
-        self._cime_driver     = "mct"
+        self._cime_driver     = get_cime_default_driver()
         self._save_timing     = save_timing
         self._queue           = queue
         self._test_data       = {} if test_data is None else test_data # Format:  {test_name -> {data_name -> data}}
@@ -317,6 +317,7 @@ class TestScheduler(object):
             for test_name in build_group:
                 logger.debug("{}{}".format("  " if test_name == build_group[0] else "    ", test_name))
 
+        self._chksum = chksum
         # By the end of this constructor, this program should never hard abort,
         # instead, errors will be placed in the TestStatus files for the various
         # tests cases
@@ -471,25 +472,6 @@ class TestScheduler(object):
         if self._pesfile is not None:
             create_newcase_cmd += " --pesfile {} ".format(self._pesfile)
 
-        if test_mods is not None:
-            files = Files(comp_interface=self._cime_driver)
-
-            if test_mods.find('/') != -1:
-                (component, modspath) = test_mods.split('/', 1)
-            else:
-                error = "Missing testmod component. Testmods are specified as '${component}-${testmod}'"
-                self._log_output(test, error)
-                return False, error
-
-            testmods_dir = files.get_value("TESTS_MODS_DIR", {"component": component})
-            test_mod_file = os.path.join(testmods_dir, component, modspath)
-            if not os.path.exists(test_mod_file):
-                error = "Missing testmod file '{}'".format(test_mod_file)
-                self._log_output(test, error)
-                return False, error
-
-            create_newcase_cmd += " --user-mods-dir {}".format(test_mod_file)
-
         mpilib = None
         ninst = 1
         ncpl = 1
@@ -501,6 +483,7 @@ class TestScheduler(object):
                     logger.debug (" MPILIB set to {}".format(mpilib))
                 elif case_opt.startswith('N'):
                     expect(ncpl == 1,"Cannot combine _C and _N options")
+                    expect(self._cime_driver != "nuopc", "_N option not supported by nuopc driver, use _C instead")
                     ninst = case_opt[1:]
                     create_newcase_cmd += " --ninst {}".format(ninst)
                     logger.debug (" NINST set to {}".format(ninst))
@@ -512,9 +495,38 @@ class TestScheduler(object):
                 elif case_opt.startswith('P'):
                     pesize = case_opt[1:]
                     create_newcase_cmd += " --pecount {}".format(pesize)
+                elif case_opt.startswith('G'):
+                    ngpus_per_node = case_opt[1:]
+                    create_newcase_cmd += " --ngpus-per-node {}".format(ngpus_per_node)
                 elif case_opt.startswith('V'):
                     self._cime_driver = case_opt[1:]
                     create_newcase_cmd += " --driver {}".format(self._cime_driver)
+
+        if test_mods is not None:
+            create_newcase_cmd += " --user-mods-dir "
+
+            for one_test_mod in test_mods: # pylint: disable=not-an-iterable
+                if one_test_mod.find('/') != -1:
+                    (component, modspath) = one_test_mod.split('/', 1)
+                else:
+                    error = "Missing testmod component. Testmods are specified as '${component}-${testmod}'"
+                    self._log_output(test, error)
+                    return False, error
+
+                files = Files(comp_interface=self._cime_driver)
+                testmods_dir = files.get_value("TESTS_MODS_DIR", {"component": component})
+                test_mod_file = os.path.join(testmods_dir, component, modspath)
+                # if no testmod is found check if a usermod of the same name exists and
+                # use it if it does.
+                if not os.path.exists(test_mod_file):
+                    usermods_dir = files.get_value("USER_MODS_DIR", {"component": component})
+                    test_mod_file = os.path.join(usermods_dir, modspath)
+                    if not os.path.exists(test_mod_file):
+                        error = "Missing testmod file '{}', checked {} and {}".format(modspath, testmods_dir, usermods_dir)
+                        self._log_output(test, error)
+                        return False, error
+
+                create_newcase_cmd += "{} ".format(test_mod_file)
 
         # create_test mpilib option overrides default but not explicitly set case_opt mpilib
         if mpilib is None and self._mpilib is not None:
@@ -675,13 +687,13 @@ class TestScheduler(object):
                     if match.group(2):
                         envtest.set_test_parameter("PIO_STRIDE_CPL",match.group(2))
 
-
                 elif (opt.startswith('I') or # Marker to distinguish tests with same name - ignored
                       opt.startswith('M') or # handled in create_newcase
                       opt.startswith('P') or # handled in create_newcase
                       opt.startswith('N') or # handled in create_newcase
                       opt.startswith('C') or # handled in create_newcase
                       opt.startswith('V') or # handled in create_newcase
+                      opt.startswith('G') or # handled in create_newcase
                       opt == 'B'):           # handled in run_phase
                     pass
 
@@ -798,6 +810,8 @@ class TestScheduler(object):
                 cmd += " --mail-user={}".format(self._mail_user)
             if self._mail_type:
                 cmd += " -M={}".format(",".join(self._mail_type))
+            if self._chksum:
+                cmd += " --chksum"
 
             return self._shell_cmd_for_phase(test, cmd, RUN_PHASE, from_dir=test_dir)
 

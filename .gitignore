@@ -18,11 +18,8 @@ scripts/Tools/JENKINS*
 # Ignore anything that are produced under scripts "cases" directory
 /scripts/cases/
 
-#Ignore nuopc driver available seperatly
-src/drivers/nuopc
+#Ignore Externals
+components
+libraries
+share
 
-#Ignore visualCIME, which is an external
-scripts/visualCIME
-
-# Ignore jupyter notebook checkpoints
-.ipynb_checkpoints/

@@ -296,6 +296,15 @@
       <desc>CORE2 DATM grid with tripolar 0.1 degree high resolution POP grid</desc>
     </model_grid>
 
+    <model_grid alias="TL319_g17_wg17" compset="DROF%JRA">
+      <grid name="atm">TL319</grid>
+      <grid name="lnd">TL319</grid>
+      <grid name="ocnice">gx1v7</grid>
+      <grid name="rof">JRA025v2</grid>
+      <grid name="wav">gx1v7</grid>
+      <mask>gx1v7</mask>
+    </model_grid>
+
     <model_grid alias="TL319_g17" not_compset="_CAM">
       <grid name="atm">TL319</grid>
       <grid name="lnd">TL319</grid>
@@ -311,6 +320,14 @@
       <grid name="ocnice">tx0.66v1</grid>
       <grid name="rof">JRA025</grid>
       <desc>0.5 degree JRA DATM grid with tripolar 0.66 degree workhorse MOM6 grid</desc>
+    </model_grid>
+
+    <model_grid alias="TL319_t061_wt061" not_compset="_CAM">
+      <grid name="atm">TL319</grid>
+      <grid name="lnd">TL319</grid>
+      <grid name="ocnice">tx0.66v1</grid>
+      <grid name="rof">JRA025</grid>
+      <grid name="wav">tx0.66v1</grid>
     </model_grid>
 
     <model_grid alias="TL319_t12" not_compset="_CAM">
@@ -357,12 +374,20 @@
       <desc>CORE2 DATM grid with tripolar 0.66 degree workhorse MOM6 grid</desc>
     </model_grid>
 
+    <model_grid alias="T62_t061_wt061" not_compset="_CAM" compset="_MOM6">
+      <grid name="atm">T62</grid>
+      <grid name="lnd">T62</grid>
+      <grid name="ocnice">tx0.66v1</grid>
+      <grid name="wav">tx0.66v1</grid>
+    </model_grid>
+
     <model_grid alias="T62_t025" not_compset="_CAM" compset="_MOM6">
       <grid name="atm">T62</grid>
       <grid name="lnd">T62</grid>
       <grid name="ocnice">tx0.25v1</grid>
       <desc>CORE2 DATM grid with tripolar 0.25 degree MOM6 grid</desc>
     </model_grid>
+
     <model_grid alias="f09_t061" compset="_MOM6">
       <grid name="atm">0.9x1.25</grid>
       <grid name="lnd">0.9x1.25</grid>
@@ -384,6 +409,14 @@
       <grid name="ocnice">gx1v7</grid>
       <mask>gx1v7</mask>
       <desc>CORE2 DATM grid with 1 degree workhorse POP grid</desc>
+    </model_grid>
+
+    <model_grid alias="T62_g17_wg17" not_compset="_CAM">
+      <grid name="atm">T62</grid>
+      <grid name="lnd">T62</grid>
+      <grid name="ocnice">gx1v7</grid>
+      <grid name="wav">gx1v7</grid>
+      <mask>gx1v7</mask>
     </model_grid>
 
     <model_grid alias="T62_oQU120" not_compset="_CAM">
@@ -493,6 +526,22 @@
       <grid name="lnd">0.9x1.25</grid>
       <grid name="ocnice">gx1v7</grid>
       <grid name="glc">gris4</grid>
+      <mask>gx1v7</mask>
+    </model_grid>
+
+    <model_grid alias="f09_g17_ais8" compset="_CISM">
+      <grid name="atm">0.9x1.25</grid>
+      <grid name="lnd">0.9x1.25</grid>
+      <grid name="ocnice">gx1v7</grid>
+      <grid name="glc">ais8</grid>
+      <mask>gx1v7</mask>
+    </model_grid>
+
+    <model_grid alias="f09_g17_ais8gris4" compset="_CISM">
+      <grid name="atm">0.9x1.25</grid>
+      <grid name="lnd">0.9x1.25</grid>
+      <grid name="ocnice">gx1v7</grid>
+      <grid name="glc">ais8:gris4</grid>
       <mask>gx1v7</mask>
     </model_grid>
 
@@ -673,6 +722,14 @@
       <grid name="atm">10x15</grid>
       <grid name="lnd">10x15</grid>
       <grid name="ocnice">10x15</grid>
+      <mask>gx3v7</mask>
+    </model_grid>
+
+    <model_grid alias="f10_f10_ais8_mg37" compset="_CISM" not_compset="_POP">
+      <grid name="atm">10x15</grid>
+      <grid name="lnd">10x15</grid>
+      <grid name="ocnice">10x15</grid>
+      <grid name="glc">ais8</grid>
       <mask>gx3v7</mask>
     </model_grid>
 
@@ -1880,6 +1937,12 @@
       <nx>416</nx> <ny>704</ny>
       <mesh driver="nuopc">$DIN_LOC_ROOT/share/meshes/greenland_4km_epsg3413_c170414_ESMFmesh_c20190729.nc</mesh>
       <desc>4-km Greenland grid, for use with the glissade dycore</desc>
+    </domain>
+
+    <domain name="ais8">
+      <nx>704</nx> <ny>576</ny>
+      <mesh driver="nuopc">$DIN_LOC_ROOT/share/meshes/antarctica_8km_epsg3031_ESMFmesh_c210621.nc</mesh>
+      <desc>8-km Antarctica grid</desc>
     </domain>
 
     <!-- ======================================================== -->
