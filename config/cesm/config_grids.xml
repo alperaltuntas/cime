@@ -305,7 +305,7 @@
       <desc>0.5 degree JRA DATM grid with tripolar 1 degree workhorse POP grid</desc>
     </model_grid>
 
-    <model_grid alias="TL319_t061" not_compset="_CAM">
+    <model_grid alias="TL319_t061" not_compset="_CAM" compset="_MOM6">
       <grid name="atm">TL319</grid>
       <grid name="lnd">TL319</grid>
       <grid name="ocnice">tx0.66v1</grid>
@@ -343,27 +343,27 @@
       <mask>gx1v7</mask>
     </model_grid>
 
-    <model_grid alias="TL639_t061" not_compset="_CAM">
+    <model_grid alias="TL639_t061" not_compset="_CAM" compset="_MOM6">
       <grid name="atm">TL639</grid>
       <grid name="lnd">TL639</grid>
       <grid name="ocnice">tx0.66v1</grid>
       <!--<grid name="rof">JRA025</grid>-->
     </model_grid>
 
-    <model_grid alias="T62_t061" not_compset="_CAM">
+    <model_grid alias="T62_t061" not_compset="_CAM" compset="_MOM6">
       <grid name="atm">T62</grid>
       <grid name="lnd">T62</grid>
       <grid name="ocnice">tx0.66v1</grid>
       <desc>CORE2 DATM grid with tripolar 0.66 degree workhorse MOM6 grid</desc>
     </model_grid>
 
-    <model_grid alias="T62_t025" not_compset="_CAM">
+    <model_grid alias="T62_t025" not_compset="_CAM" compset="_MOM6">
       <grid name="atm">T62</grid>
       <grid name="lnd">T62</grid>
       <grid name="ocnice">tx0.25v1</grid>
       <desc>CORE2 DATM grid with tripolar 0.25 degree MOM6 grid</desc>
     </model_grid>
-    <model_grid alias="f09_t061">
+    <model_grid alias="f09_t061" compset="_MOM6">
       <grid name="atm">0.9x1.25</grid>
       <grid name="lnd">0.9x1.25</grid>
       <grid name="ocnice">tx0.66v1</grid>

@@ -61,11 +61,13 @@ $COMP_LND == 'clm':
 $COMP_GLC == 'cism':
     assert $COMP_GLC_OPTION != "(none)", "Must pick a valid CISM option."
 
-$COMP_LND == 'clm' and $COMP_OCN == 'pop' and ('BGC' in $COMP_LND_OPTION or 'ECO' in $COMP_OCN_OPTION):
-    assert ('BGC' in $COMP_LND_OPTION) == ('ECO' in $COMP_OCN_OPTION),  "POP must be in BGC mode if land is too, and vice versa."
+# the below compliance rule is specified for testing the logic solver only. In practice, this assertion rather be a warning.
+#$COMP_LND == 'clm' and $COMP_OCN == 'pop' and ('BGC' in $COMP_LND_OPTION or 'ECO' in $COMP_OCN_OPTION):
+#    assert ('BGC' in $COMP_LND_OPTION) == ('ECO' in $COMP_OCN_OPTION),  "POP must be in BGC mode if land is too, and vice versa."
 
-$COMP_ATM == 'datm' and $COMP_ROF == 'drof' and ($COMP_ROF_OPTION == 'JRA' or $COMP_ATM_OPTION == 'JRA'):
-    assert ($COMP_ROF_OPTION == 'JRA') == ($COMP_ATM_OPTION == 'JRA'), "IF DROF is set to be JRA, then DATM must be too."
+# the below compliance rule is specified for testing the logic solver only. In practice, this assertion should rather be a warning
+$COMP_ATM == 'datm' and $COMP_ROF == 'drof' and ($COMP_ROF_OPTION .startswith('JRA') or $COMP_ATM_OPTION .startswith('JRA')):
+    assert ($COMP_ROF_OPTION .startswith('JRA')) == ($COMP_ATM_OPTION .startswith('JRA')), "IF DROF is set to be JRA, then DATM must be too."
 
 # Grids ---------------------------------------------
 
