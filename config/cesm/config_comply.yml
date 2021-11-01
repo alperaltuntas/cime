@@ -34,6 +34,18 @@ True:
         "If CLM is coupled with DATM, then ICE must be stub"
     - assert not ($COMP_ATM=="datm" and $COMP_LND=="clm" ) or ($COMP_OCN=="socn"),
         "If CLM is coupled with DATM, then OCN must be stub"
+    - assert any(opt in $COMP_ATM_OPTION for opt in ["ADIAB", "DABIP04", "TJ16", "HS94", "KESSLER"]) == False or $COMP_LND == "slnd",
+        "When a simple physics option is picked, CAM cannot be coupled with other components"
+    - assert any(opt in $COMP_ATM_OPTION for opt in ["ADIAB", "DABIP04", "TJ16", "HS94", "KESSLER"]) == False or $COMP_ICE == "sice",
+        "When a simple physics option is picked, CAM cannot be coupled with other components"
+    - assert any(opt in $COMP_ATM_OPTION for opt in ["ADIAB", "DABIP04", "TJ16", "HS94", "KESSLER"]) == False or $COMP_OCN == "socn",
+        "When a simple physics option is picked, CAM cannot be coupled with other components"
+    - assert any(opt in $COMP_ATM_OPTION for opt in ["ADIAB", "DABIP04", "TJ16", "HS94", "KESSLER"]) == False or $COMP_ROF == "srof",
+        "When a simple physics option is picked, CAM cannot be coupled with other components"
+    - assert any(opt in $COMP_ATM_OPTION for opt in ["ADIAB", "DABIP04", "TJ16", "HS94", "KESSLER"]) == False or $COMP_GLC == "sglc",
+        "When a simple physics option is picked, CAM cannot be coupled with other components"
+    - assert any(opt in $COMP_ATM_OPTION for opt in ["ADIAB", "DABIP04", "TJ16", "HS94", "KESSLER"]) == False or $COMP_WAV == "swav",
+        "When a simple physics option is picked, CAM cannot be coupled with other components"
 
 # Preconditioned assertions ---------------------------------------------
 
@@ -73,6 +85,9 @@ $COMP_ATM == 'datm' and $COMP_ROF == 'drof' and ($COMP_ROF_OPTION .startswith('J
 
 $COMP_ATM=="cam":
     assert "SCAM" in $COMP_ATM_PHYS or $ATM_GRID != "T42", "T42 grid can only be used with SCAM option."
+
+#'"CAM60" in $COMPSET and "%WX" not in $COMPSET':
+#    assert $MASK_GRID != "gx1v6", "gx1v6 mask cannot be used with CAM60 physics unless running with WACCM-X"
 
 $COMP_OCN=="mom":
     assert $OCN_GRID in ["tx0.66v1", "gx1v6", "tx0.25v1"], "Not a valid MOM6 grid."

@@ -29,6 +29,7 @@
       <grid name="atm"       compset="SATM"        >null</grid>
       <grid name="lnd"       compset="SLND"        >null</grid>
       <grid name="ocnice"    compset="SOCN"        >null</grid>
+
       <grid name="rof"       compset="SROF"        >null</grid>
       <grid name="rof"       compset="DWAV"        >rx1</grid>
       <grid name="rof"       compset="RTM"         >r05</grid>
@@ -627,7 +628,6 @@
       <grid name="ocnice">gx1v7</grid>
       <grid name="rof">r05</grid>
       <mask>gx1v7</mask>
-      <desc>FV 2-deg grid with 1 degree POP grid and r05 ROF grid</desc>
     </model_grid>
 
     <model_grid alias="f19_g17_gris4" compset="_CISM">
