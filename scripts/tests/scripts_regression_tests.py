@@ -365,7 +365,8 @@ class J_TestCreateNewcase(unittest.TestCase):
         if os.path.exists(testdir):
             shutil.rmtree(testdir)
         args = " --case %s --compset X --output-root %s --handle-preexisting-dirs=r" % (testdir, cls._testroot)
-        args += " --run-unsupported"
+        if get_model() == "cesm":
+            args += " --run-unsupported"
         if TEST_COMPILER is not None:
             args = args +  " --compiler %s"%TEST_COMPILER
         if TEST_MPILIB is not None:
@@ -381,7 +382,7 @@ class J_TestCreateNewcase(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(testdir, "case.setup")))
 
         run_cmd_assert_result(self, "./case.setup", from_dir=testdir)
-        run_cmd_assert_result(self, "./case.build", from_dir=testdir)
+        run_cmd_assert_result(self, "./case.build --skip-provenance-check", from_dir=testdir)
 
         with Case(testdir, read_only=False) as case:
             ntasks = case.get_value("NTASKS_ATM")
@@ -392,12 +393,12 @@ class J_TestCreateNewcase(unittest.TestCase):
                               from_dir=testdir, expected_stat=1)
 
         run_cmd_assert_result(self, "./case.setup --reset", from_dir=testdir)
-        run_cmd_assert_result(self, "./case.build", from_dir=testdir)
+        run_cmd_assert_result(self, "./case.build --skip-provenance-check", from_dir=testdir)
         with Case(testdir, read_only=False) as case:
             case.set_value("CHARGE_ACCOUNT", "fred")
 
         # this should not fail with a locked file issue
-        run_cmd_assert_result(self, "./case.build", from_dir=testdir)
+        run_cmd_assert_result(self, "./case.build --skip-provenance-check", from_dir=testdir)
 
         run_cmd_assert_result(self, "./case.st_archive --test-all", from_dir=testdir)
 
@@ -455,7 +456,8 @@ class J_TestCreateNewcase(unittest.TestCase):
 
         user_mods_dir = os.path.join(CIME.utils.get_python_libs_root(), "..", "tests", "user_mods_test1")
         args = " --case %s --compset X --user-mods-dir %s --output-root %s --handle-preexisting-dirs=r"% (testdir, user_mods_dir, cls._testroot)
-        args += " --run-unsupported"
+        if get_model() == "cesm":
+            args += " --run-unsupported"
         if TEST_COMPILER is not None:
             args = args + " --compiler %s"%TEST_COMPILER
         if TEST_MPILIB is not None:
@@ -609,7 +611,7 @@ class J_TestCreateNewcase(unittest.TestCase):
 
         run_cmd_assert_result(self, "%s/create_newcase %s"%(SCRIPT_DIR, args), from_dir=SCRIPT_DIR)
         run_cmd_assert_result(self, "./case.setup", from_dir=testdir)
-        run_cmd_assert_result(self, "./case.build", from_dir=testdir)
+        run_cmd_assert_result(self, "./case.build --skip-provenance-check", from_dir=testdir)
 
         cls._do_teardown.append(testdir)
 
@@ -649,7 +651,8 @@ class J_TestCreateNewcase(unittest.TestCase):
 
         cls._testdirs.append(testdir)
         args = " --case CreateNewcaseTest --script-root %s --compset X --output-root %s --handle-preexisting-dirs u" % (testdir, cls._testroot)
-        args += " --run-unsupported"
+        if get_model() == "cesm":
+            args += " --run-unsupported"
         if TEST_COMPILER is not None:
             args += " --compiler %s"%TEST_COMPILER
         if TEST_MPILIB is not None:
@@ -817,6 +820,7 @@ class J_TestCreateNewcase(unittest.TestCase):
         newmachfile = os.path.join(get_cime_root(),"config",
                                    "xml_schemas","config_machines_template.xml")
         safe_copy(newmachfile, os.path.join(extra_machines_dir, "config_machines.xml"))
+        os.environ["CIME_NO_CMAKE_MACRO"] = "ON"
         config_compilers_text = """\
 <?xml version="1.0" encoding="UTF-8"?>
 <config_compilers version="2.0">
@@ -837,10 +841,12 @@ class J_TestCreateNewcase(unittest.TestCase):
         # config_machines_template.xml
         args = (" --case {testdir} --compset X --mach mymachine"
                 " --output-root {testroot} --non-local"
-                " --extra-machines-dir {extra_machines_dir}"
-                " --run-unsupported".format(
+                " --extra-machines-dir {extra_machines_dir}".format(
                     testdir=testdir, testroot=cls._testroot,
                     extra_machines_dir=extra_machines_dir))
+        if get_model() == "cesm":
+            args += " --run-unsupported"
+
         if CIME.utils.get_cime_default_driver() == "nuopc":
             args += " --res f19_g17 "
         else:
@@ -854,12 +860,14 @@ class J_TestCreateNewcase(unittest.TestCase):
                               from_dir=testdir)
 
         # Make sure Macros file contains expected text
-        macros_file_name = os.path.join(testdir, "Macros.make")
-        self.assertTrue(os.path.isfile(macros_file_name))
-        with open(macros_file_name) as macros_file:
-            macros_contents = macros_file.read()
-        expected_re = re.compile("NETCDF_PATH.*/my/netcdf/path")
-        self.assertTrue(expected_re.search(macros_contents))
+        if get_model() != "e3sm":
+            macros_file_name = os.path.join(testdir, "Macros.make")
+            self.assertTrue(os.path.isfile(macros_file_name))
+            with open(macros_file_name) as macros_file:
+                macros_contents = macros_file.read()
+            expected_re = re.compile("NETCDF_PATH.*/my/netcdf/path")
+            self.assertTrue(expected_re.search(macros_contents))
+        del os.environ["CIME_NO_CMAKE_MACRO"] 
 
     def test_m_createnewcase_alternate_drivers(self):
         # Test that case.setup runs for nuopc and moab drivers
@@ -2059,7 +2067,7 @@ class K_TestCimeCase(TestCreateTestCommon):
         if os.path.exists(testdir):
             shutil.rmtree(testdir)
         args = "--case {name} --script-root {testdir} --compset X --res f19_g16 --handle-preexisting-dirs=r --output-root {testdir}".format(name=testcase_name, testdir=testdir)
-        if CIME.utils.get_cime_default_driver() == 'nuopc':
+        if get_model() == "cesm":
             args += " --run-unsupported"
 
         run_cmd_assert_result(self, "{}/create_newcase {}".format(SCRIPT_DIR, args),
@@ -2545,7 +2553,7 @@ class K_TestCimeCase(TestCreateTestCommon):
 
         run_cmd_assert_result(self, "./xmlchange CCSM_CPRNC=this_is_a_broken_cprnc",
                               from_dir=casedir)
-        run_cmd_assert_result(self, "./case.build", from_dir=casedir)
+        run_cmd_assert_result(self, "./case.build --skip-provenance-check", from_dir=casedir)
         run_cmd_assert_result(self, "./case.submit", from_dir=casedir)
 
         self._wait_for_tests(self._baseline_name, always_wait=True)
@@ -2596,7 +2604,7 @@ class G_TestBuildSystem(TestCreateTestCommon):
         run_cmd_assert_result(self, "./case.build --clean atm", from_dir=casedir)
         run_cmd_assert_result(self, "./case.build --clean gptl", from_dir=casedir)
 
-        run_cmd_assert_result(self, "./case.build", from_dir=casedir)
+        run_cmd_assert_result(self, "./case.build --skip-provenance-check", from_dir=casedir)
 
 ###############################################################################
 class L_TestSaveTimings(TestCreateTestCommon):
