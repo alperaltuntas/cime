@@ -2,6 +2,7 @@
 functions for building CIME models
 """
 import glob, shutil, time, threading, subprocess
+from pathlib import Path
 from CIME.XML.standard_module_setup  import *
 from CIME.utils                 import get_model, analyze_build_log, \
     stringify_bool, run_and_log_case_status, get_timestamp, run_sub_or_cmd, \
@@ -21,6 +22,80 @@ _CMD_ARGS_FOR_BUILD = \
      "CAM_CONFIG_OPTS", "COMP_LND", "COMPARE_TO_NUOPC", "HOMME_TARGET",
      "OCN_SUBMODEL", "CISM_USE_TRILINOS", "USE_TRILINOS", "USE_ALBANY", "USE_PETSC")
 
+def get_makefile_vars(case, caseroot, comp=None):
+    """
+    Run cmake and process output to a list of variable settings
+    """
+    cmake_args = get_standard_cmake_args(case, "DO_NOT_USE", shared_lib=True)
+    dcomp = "-DCOMP_NAME={}".format(comp) if comp else ""
+    output = run_cmd_no_fail("cmake -DCONVERT_TO_MAKE=ON {dcomp} {cmake_args} .".format(dcomp=dcomp, cmake_args=cmake_args),
+                             combine_output=True, from_dir=os.path.join(caseroot, "cmaketmp"))
+
+    lines_to_keep = []
+    for line in output.splitlines():
+        if "CIME_SET_MAKEFILE_VAR" in line and "BUILD_INTERNAL_IGNORE" not in line:
+            lines_to_keep.append(line)
+
+    output_to_keep = "\n".join(lines_to_keep) + "\n"
+    output_to_keep = output_to_keep.replace("CIME_SET_MAKEFILE_VAR ", "").\
+                     replace("CPPDEFS := ", "CPPDEFS := $(CPPDEFS) ").\
+                     replace("SLIBS := ", "SLIBS := $(SLIBS) ") + "\n"
+
+    return output_to_keep
+
+def generate_makefile_macro(case, caseroot):
+    """
+    Generates a flat Makefile macro file based on the CMake cache system.
+    This macro is only used by certain sharedlibs since components use CMake.
+    Since indirection based on comp_name is allowed for sharedlibs, each sharedlib must generate
+    their own macro.
+    """
+    new_cmake_dir = os.path.join(caseroot, "cmake_macros")
+    if not os.path.isdir(new_cmake_dir):
+        return
+    cmake_lists = os.path.join(new_cmake_dir, "CMakeLists.txt")
+    Path(os.path.join(caseroot,"cmaketmp")).mkdir(parents=False, exist_ok=True)
+    safe_copy(cmake_lists, "cmaketmp")
+
+    # Append CMakeLists.txt with compset specific stuff
+    comps = _get_compset_comps(case)
+    comps.extend(["mct", "pio{}".format(case.get_value("PIO_VERSION")), "gptl", "csm_share", "csm_share_cpl7"])
+    cmake_macro = os.path.join(caseroot, "Macros.cmake")
+    expect(os.path.exists(cmake_macro), "Cannot generate Makefile macro without {}".format(cmake_macro))
+
+    # run once with no COMP_NAME
+    no_comp_output = get_makefile_vars(case, caseroot)
+    all_output     = no_comp_output
+    no_comp_lines  = no_comp_output.splitlines()
+
+    for comp in comps:
+        comp_output = get_makefile_vars(case, caseroot, comp=comp)
+        # The Tools/Makefile may have already adding things to CPPDEFS and SLIBS
+        comp_lines  = comp_output.splitlines()
+        first = True
+        for comp_line in comp_lines:
+            if comp_line not in no_comp_lines:
+                if first:
+                    all_output += "ifeq \"$(COMP_NAME)\" \"{}\"\n".format(comp)
+                    first = False
+
+                all_output += "  "+comp_line+"\n"
+
+        if not first:
+            all_output += "endif\n"
+
+    with open(os.path.join(caseroot, "Macros.make"), "w") as fd:
+        fd.write(
+"""
+# This file is auto-generated, do not edit. If you want to change
+# sharedlib flags, you can edit the cmake_macros in this case. You
+# can change flags for specific sharedlibs only by checking COMP_NAME.
+
+""")
+        fd.write(all_output)
+
+    shutil.rmtree(os.path.join(caseroot,"cmaketmp"))
+
 def get_standard_makefile_args(case, shared_lib=False):
     make_args = "CIME_MODEL={} ".format(case.get_value("MODEL"))
     make_args += " SMP={} ".format(stringify_bool(case.get_build_threaded()))
@@ -29,6 +104,19 @@ def get_standard_makefile_args(case, shared_lib=False):
         make_args += xml_to_make_variable(case, var)
 
     return make_args
+
+def _get_compset_comps(case):
+    comps = []
+    driver = case.get_value("COMP_INTERFACE")
+    for comp_class in case.get_values("COMP_CLASSES"):
+        comp = case.get_value("COMP_{}".format(comp_class))
+        if comp == "cpl":
+            comp = "driver"
+        if comp == "s{}".format(comp_class.lower()) and driver == "nuopc":
+            comp = ""
+        else:
+            comps.append(comp)
+    return comps
 
 def get_standard_cmake_args(case, sharedpath, shared_lib=False):
     cmake_args = "-DCIME_MODEL={} ".format(case.get_value("MODEL"))
@@ -44,7 +132,7 @@ def get_standard_cmake_args(case, sharedpath, shared_lib=False):
 
     if not shared_lib:
         cmake_args += " -DUSE_KOKKOS={} ".format(stringify_bool(uses_kokkos(case)))
-        comps = [case.get_value("COMP_{}".format(comp_class)) for comp_class in case.get_values("COMP_CLASSES")]
+        comps = _get_compset_comps(case)
         cmake_args += " -DCOMP_NAMES='{}' ".format(";".join(comps))
 
     for var in _CMD_ARGS_FOR_BUILD:
@@ -76,7 +164,7 @@ def uses_kokkos(case):
     cam_target = case.get_value("CAM_TARGET")
     # atm_comp   = case.get_value("COMP_ATM") # scream does not use the shared kokkoslib for now
 
-    return get_model() == "e3sm" and cam_target in ("preqx_kokkos", "theta-l")
+    return get_model() == "e3sm" and cam_target in ("preqx_kokkos", "theta-l", "theta-l_kokkos")
 
 ###############################################################################
 def _build_model(build_threaded, exeroot, incroot, complist,
@@ -419,7 +507,6 @@ def _build_libraries(case, exeroot, sharedpath, caseroot, cimeroot, libroot, lid
     for lib in libs:
         build_script[lib] = files.get_value("BUILD_LIB_FILE",{"lib":lib})
 
-
     sharedlibroot = os.path.abspath(case.get_value("SHAREDLIBROOT"))
     # Check if we need to build our own cprnc
     if case.get_value("TEST"):
@@ -432,6 +519,10 @@ def _build_libraries(case, exeroot, sharedpath, caseroot, cimeroot, libroot, lid
                 libs.insert(0,"cprnc")
 
     logs = []
+
+    # generate Makefile macro
+    generate_makefile_macro(case, caseroot)
+
 
     for lib in libs:
         if buildlist is not None and lib not in buildlist:
@@ -511,7 +602,7 @@ def _build_model_thread(config_dir, compclass, compname, caseroot, libroot, bldr
         cmd = os.path.join(config_dir, "buildlib")
         expect(os.path.isfile(cmd), "Could not find buildlib for {}".format(compname))
 
-    compile_cmd = "MODEL={compclass} COMP_CLASS={compclass} COMP_NAME={compname} {cmd} {caseroot} {libroot} {bldroot} ".\
+    compile_cmd = "COMP_CLASS={compclass} COMP_NAME={compname} {cmd} {caseroot} {libroot} {bldroot} ".\
         format(compclass=compclass, compname=compname, cmd=cmd, caseroot=caseroot, libroot=libroot, bldroot=bldroot)
     if get_model() != "ufs":
         compile_cmd = "SMP={} {}".format(stringify_bool(smp), compile_cmd)
@@ -592,6 +683,8 @@ def _clean_impl(case, cleanlist, clean_all, clean_depends):
                 clean_cmd = "cd {} && {} clean".format(cmake_path, gmake)
             else:
                 # Item was created by classic build system
+                # do I need this? generate_makefile_macro(case, caseroot, clean_item)
+
                 clean_cmd = "{} {}{}".format(classic_cmd, "clean" if clean_item in cleanlist else "clean_depends", clean_item)
 
             logger.info("calling {}".format(clean_cmd))

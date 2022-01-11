@@ -29,6 +29,8 @@ class Machines(GenericXML):
         self.machine = None
         self.machines_dir = None
         self.custom_settings = {}
+        self.extra_machines_dir = extra_machines_dir
+
         schema = None
         supported_models = []
         if files is None:
@@ -89,6 +91,9 @@ class Machines(GenericXML):
         Return the directory of the machines file
         """
         return self.machines_dir
+
+    def get_extra_machines_dir(self):
+        return self.extra_machines_dir
 
     def get_machine_name(self):
         """
@@ -165,14 +170,26 @@ class Machines(GenericXML):
             logger.debug("machine is " + machtocheck)
             regex_str_node = self.get_optional_child("NODENAME_REGEX", root=node)
             regex_str = machtocheck if regex_str_node is None else self.text(regex_str_node)
-
+            
             if regex_str is not None:
                 logger.debug("machine regex string is " + regex_str)
-                regex = re.compile(regex_str)
-                if regex.match(nametomatch):
-                    logger.debug("Found machine: {} matches {}".format(machtocheck, nametomatch))
-                    machine = machtocheck
-                    break
+                # an environment variable can be used
+                if regex_str.startswith("$ENV"):
+                    machine_value = self.get_resolved_value(regex_str, allow_unresolved_envvars=True)
+                    if not machine_value.startswith("$ENV"):
+                        try:
+                            match, this_machine = machine_value.split(":")
+                        except ValueError:
+                            expect(False,"Bad formation of NODENAME_REGEX.  Expected envvar:value, found {}".format(regex_str))
+                        if match == this_machine:
+                            machine = machtocheck
+                            break
+                else:    
+                    regex = re.compile(regex_str)
+                    if regex.match(nametomatch):
+                        logger.debug("Found machine: {} matches {}".format(machtocheck, nametomatch))
+                        machine = machtocheck
+                        break
 
         return machine
 
@@ -201,7 +218,10 @@ class Machines(GenericXML):
         """
         Get Value of fields in the config_machines.xml file
         """
-        expect(self.machine_node is not None, "Machine object has no machine defined")
+        if self.machine_node is None:
+            logger.warning("Machine object has no machine defined")
+            return None
+
         expect(subgroup is None, "This class does not support subgroups")
         value = None
 
