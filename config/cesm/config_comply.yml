@@ -70,6 +70,12 @@ $COMP_WAV == 'dwav':
 $COMP_LND == 'clm':
     assert $COMP_LND_OPTION != "(none)", "Must pick a valid CLM option."
 
+$COMP_LND == 'dlnd':
+    assert $COMP_LND_OPTION != "(none)", "Must pick a valid DLND option."
+
+$COMP_OCN == 'docn':
+    assert $COMP_OCN_OPTION != "(none)", "Must pick a valid DOCN option."
+
 $COMP_GLC == 'cism':
     assert $COMP_GLC_OPTION != "(none)", "Must pick a valid CISM option."
 
