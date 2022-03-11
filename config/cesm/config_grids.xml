@@ -717,15 +717,17 @@
       <grid name="lnd">1.9x2.5</grid>
       <grid name="ocnice">1.9x2.5</grid>
       <mask>gx1v6</mask>
+      <desc>FV 2-deg grid</desc>
     </model_grid>
 
+    <!-- This is identical to the above grid
     <model_grid alias="f19_f19" not_compset="_POP">
       <grid name="atm">1.9x2.5</grid>
       <grid name="lnd">1.9x2.5</grid>
       <grid name="ocnice">1.9x2.5</grid>
       <mask>gx1v6</mask>
-      <desc>FV 2-deg grid</desc>
     </model_grid>
+    -->
 
     <model_grid alias="f19_f19_mnull" compset="_DOCN%SAQUAP|DOCN%DAQUAP" >
       <grid name="atm">1.9x2.5</grid>

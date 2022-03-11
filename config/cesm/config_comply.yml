@@ -98,6 +98,9 @@ $COMP_ATM=="cam":
 $COMP_OCN=="mom":
     assert $OCN_GRID in ["tx0.66v1", "gx1v6", "tx0.25v1"], "Not a valid MOM6 grid."
 
+'"AQ" in $COMP_OCN_OPTION' :
+    assert $OCN_GRID in ["f1.9x2.5", "0.9x1.25", "4x5"], "When in aquaplanet mode, the OCN grid must be set to f09, f19, or f45"
+
 ### Safety and liveness rules to be checked:
 # (1) Each option must eventually be eligible.
 # (2) At least one option of a particular eligible variable must be eligible at any time.
