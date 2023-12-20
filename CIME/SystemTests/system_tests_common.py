@@ -28,7 +28,7 @@ from CIME.provenance import save_test_time, get_test_success
 from CIME.locked_files import LOCKED_DIR, lock_file, is_locked
 from CIME.baselines.performance import (
     get_latest_cpl_logs,
-    _perf_get_memory,
+    perf_get_memory_list,
     perf_compare_memory_baseline,
     perf_compare_throughput_baseline,
     perf_write_baseline,
@@ -686,40 +686,59 @@ for some of your components.
         Compares current test memory usage to baseline.
         """
         with self._test_status:
-            below_tolerance, comment = perf_compare_memory_baseline(self._case)
+            try:
+                below_tolerance, comment = perf_compare_memory_baseline(self._case)
+            except Exception as e:
+                logger.info("Failed to compare memory usage baseline: {!s}".format(e))
 
-            if below_tolerance is not None:
-                append_testlog(comment, self._orig_caseroot)
+                self._test_status.set_status(
+                    MEMCOMP_PHASE, TEST_FAIL_STATUS, comments=str(e)
+                )
+            else:
+                if below_tolerance is not None:
+                    append_testlog(comment, self._orig_caseroot)
 
-                if (
-                    below_tolerance
-                    and self._test_status.get_status(MEMCOMP_PHASE) is None
-                ):
-                    self._test_status.set_status(MEMCOMP_PHASE, TEST_PASS_STATUS)
-                elif self._test_status.get_status(MEMCOMP_PHASE) != TEST_FAIL_STATUS:
-                    self._test_status.set_status(
-                        MEMCOMP_PHASE, TEST_FAIL_STATUS, comments=comment
-                    )
+                    if (
+                        below_tolerance
+                        and self._test_status.get_status(MEMCOMP_PHASE) is None
+                    ):
+                        self._test_status.set_status(MEMCOMP_PHASE, TEST_PASS_STATUS)
+                    elif (
+                        self._test_status.get_status(MEMCOMP_PHASE) != TEST_FAIL_STATUS
+                    ):
+                        self._test_status.set_status(
+                            MEMCOMP_PHASE, TEST_FAIL_STATUS, comments=comment
+                        )
 
     def _compare_throughput(self):
         """
         Compares current test throughput to baseline.
         """
         with self._test_status:
-            below_tolerance, comment = perf_compare_throughput_baseline(self._case)
+            try:
+                below_tolerance, comment = perf_compare_throughput_baseline(self._case)
+            except Exception as e:
+                logger.info("Failed to compare throughput baseline: {!s}".format(e))
 
-            if below_tolerance is not None:
-                append_testlog(comment, self._orig_caseroot)
+                self._test_status.set_status(
+                    THROUGHPUT_PHASE, TEST_FAIL_STATUS, comments=str(e)
+                )
+            else:
+                if below_tolerance is not None:
+                    append_testlog(comment, self._orig_caseroot)
 
-                if (
-                    below_tolerance
-                    and self._test_status.get_status(THROUGHPUT_PHASE) is None
-                ):
-                    self._test_status.set_status(THROUGHPUT_PHASE, TEST_PASS_STATUS)
-                elif self._test_status.get_status(THROUGHPUT_PHASE) != TEST_FAIL_STATUS:
-                    self._test_status.set_status(
-                        THROUGHPUT_PHASE, TEST_FAIL_STATUS, comments=comment
-                    )
+                    if (
+                        below_tolerance
+                        and self._test_status.get_status(THROUGHPUT_PHASE) is None
+                    ):
+                        self._test_status.set_status(THROUGHPUT_PHASE, TEST_PASS_STATUS)
+                    elif (
+                        self._test_status.get_status(THROUGHPUT_PHASE)
+                        != TEST_FAIL_STATUS
+                    ):
+                        self._test_status.set_status(
+                            THROUGHPUT_PHASE, TEST_FAIL_STATUS, comments=comment
+                        )
 
     def _compare_baseline(self):
         """
@@ -787,7 +806,7 @@ def perf_check_for_memory_leak(case, tolerance):
 
     for cpllog in latestcpllogs:
         try:
-            memlist = _perf_get_memory(case, cpllog)
+            memlist = perf_get_memory_list(case, cpllog)
         except RuntimeError:
             return False, "insufficient data for memleak test"
 
